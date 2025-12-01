@@ -11,19 +11,30 @@
 
 ## 🚀 部署到 Vercel
 
-### 1. 环境变量配置
+### 1. 配置数据库
+
+#### 方式一：使用 Vercel Postgres（推荐）
+
+1. 在 Vercel 项目设置中，进入 **Storage** 标签
+2. 点击 **Create Database**，选择 **Postgres**
+3. 创建数据库后，Vercel 会自动添加 `POSTGRES_URL` 环境变量
+
+#### 方式二：使用外部 PostgreSQL 数据库
+
+在 Vercel 项目设置中添加以下环境变量：
+
+- `POSTGRES_URL`: PostgreSQL 连接字符串
+  - 格式：`postgresql://username:password@host:port/database`
+  - 示例：`postgresql://user:pass@localhost:5432/mydb`
+
+### 2. 其他环境变量配置
 
 在 Vercel 项目设置中添加以下环境变量：
 
 - `OPENAI_API_KEY`: OpenAI API 密钥
-- `POSTGRES_URL`: PostgreSQL 数据库连接 URL（如果使用 Vercel Postgres，会自动提供）
-- `POSTGRES_USER`: 数据库用户名
-- `POSTGRES_HOST`: 数据库主机
-- `POSTGRES_PASSWORD`: 数据库密码
-- `POSTGRES_DATABASE`: 数据库名称
-- `INIT_DB_SECRET`: 数据库初始化密钥（可选，用于保护初始化接口）
+- `INIT_DB_SECRET`: 数据库初始化密钥（可选，用于保护初始化接口，默认为 'dev-secret'）
 
-### 2. 初始化数据库
+### 3. 初始化数据库
 
 部署后，访问 `/api/init-db` 接口初始化数据库表结构：
 
@@ -33,7 +44,7 @@ curl -X POST https://your-domain.vercel.app/api/init-db \
   # 或使用查询参数: ?secret=your-secret
 ```
 
-### 3. 创建账号
+### 4. 创建账号
 
 ```bash
 curl -X POST https://your-domain.vercel.app/api/accounts \
