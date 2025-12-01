@@ -48,6 +48,7 @@ export interface WordRecord {
   original_word: string | null;  // 原始输入
   url: string;                   // 来源网页 URL
   title: string;                 // 来源网页标题
+  created_at_ms: number;         // 创建时间戳（毫秒）
   phonetic: string | null;       // 音标
   meanings: Meaning[] | null;     // 释义数组（JSONB）
   root: string | null;           // 词根
@@ -55,8 +56,8 @@ export interface WordRecord {
   sentences: string[];            // 例句数组（JSONB）
   notes: Record<string, string> | null; // 例句解析（JSONB）
   review_times: number[];         // 复习时间戳数组（JSONB）
-  created_at: Date | string;      // 数据库创建时间
-  updated_at: Date | string;      // 数据库更新时间
+  db_created_at: Date | string;   // 数据库创建时间
+  db_updated_at: Date | string;   // 数据库更新时间
 }
 
 // API 请求/响应类型
