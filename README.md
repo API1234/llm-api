@@ -1,6 +1,14 @@
-# 🧠 Word Analyzer API (Vercel)
+# 🧠 Word Analyzer API (Next.js + TypeScript)
 
-一个基于大模型的英语词根与词族提取 API，支持账号隔离和单词管理。
+一个基于 Next.js 和 TypeScript 的英语词根与词族提取 API，支持账号隔离和单词管理。
+
+## 技术栈
+
+- **框架**: Next.js 14 (App Router)
+- **语言**: TypeScript
+- **数据库**: PostgreSQL (@vercel/postgres)
+- **AI**: OpenAI
+- **部署**: Vercel
 
 ## 功能特性
 
