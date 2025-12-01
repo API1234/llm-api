@@ -17,7 +17,11 @@
 
 1. 在 Vercel 项目设置中，进入 **Storage** 标签
 2. 点击 **Create Database**，选择 **Postgres**
-3. 创建数据库后，Vercel 会自动添加 `POSTGRES_URL` 环境变量
+3. 创建数据库后，Vercel 会自动添加以下环境变量：
+   - `POSTGRES_URL` - 池化连接字符串（用于常规查询）
+   - `POSTGRES_URL_NON_POOLING` - 非池化连接字符串（用于创建表等操作）
+   
+   代码会自动使用合适的连接字符串。
 
 #### 方式二：使用外部 PostgreSQL 数据库
 
