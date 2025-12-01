@@ -1,5 +1,3 @@
-import OpenAI from "openai";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
@@ -8,34 +6,34 @@ export default async function handler(req, res) {
   const { word } = req.body;
   if (!word) return res.status(400).json({ error: "Missing 'word'" });
 
+  const appKey = process.env.XHS_APP_KEY;
+  if (!appKey) {
+    return res.status(500).json({ error: "APP_KEY environment variable is not set" });
+  }
+
   try {
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
-
-    const prompt = `
-You are a morphological analyzer.
-Given a single English word, extract:
-- Lemma (base form)
-- Part of speech
-- Word family (noun, adjective, adverb, verb forms)
-Return JSON only.
-
-Word: ${word}
-    `;
-
-    const response = await client.responses.create({
-      model: "gpt-4.1",
-      input: prompt
-    });
-
-    const json = JSON.parse(
-      response.output_text ?? response.output[0].content[0].text
+    const response = await fetch(
+      "https://aiplat-gateway.devops.beta.xiaohongshu.com/allin-workflow-apidemo/pipelines/main",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          APP_ID: "apidemo",
+          APP_KEY: appKey
+        },
+        body: JSON.stringify({ word })
+      }
     );
 
-    return res.status(200).json(json);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return res.status(200).json(data);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "LLM error", details: err.message });
   }
 }
+
