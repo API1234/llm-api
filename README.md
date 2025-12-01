@@ -1,16 +1,139 @@
 # 🧠 Word Analyzer API (Vercel)
 
-一个基于大模型的英语词根与词族提取 API。
+一个基于大模型的英语词根与词族提取 API，支持账号隔离和单词管理。
 
-输入一个单词 → 输出：
+## 功能特性
 
-- lemma（词元）
-- part of speech（词性）
-- word family（词族）
--（可扩展）
-
----
+- ✅ 单词分析（基于 OpenAI）
+- ✅ 数据库存储（PostgreSQL）
+- ✅ 账号隔离（API Key 认证）
+- ✅ 单词 CRUD 操作（创建、读取、更新、删除）
 
 ## 🚀 部署到 Vercel
+
+### 1. 环境变量配置
+
+在 Vercel 项目设置中添加以下环境变量：
+
+- `OPENAI_API_KEY`: OpenAI API 密钥
+- `POSTGRES_URL`: PostgreSQL 数据库连接 URL（如果使用 Vercel Postgres，会自动提供）
+- `POSTGRES_USER`: 数据库用户名
+- `POSTGRES_HOST`: 数据库主机
+- `POSTGRES_PASSWORD`: 数据库密码
+- `POSTGRES_DATABASE`: 数据库名称
+- `INIT_DB_SECRET`: 数据库初始化密钥（可选，用于保护初始化接口）
+
+### 2. 初始化数据库
+
+部署后，访问 `/api/init-db` 接口初始化数据库表结构：
+
+```bash
+curl -X POST https://your-domain.vercel.app/api/init-db \
+  -H "X-Init-Secret: your-secret" \
+  # 或使用查询参数: ?secret=your-secret
+```
+
+### 3. 创建账号
+
+```bash
+curl -X POST https://your-domain.vercel.app/api/accounts \
+  -H "Content-Type: application/json" \
+  -d '{"name": "我的账号"}'
+```
+
+响应会返回 `api_key`，请妥善保存。
+
+## 📚 API 接口文档
+
+### 1. 单词分析（原有功能）
+
+**POST** `/api/analyze`
+
+```bash
+curl -X POST https://your-domain.vercel.app/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"word": "hello"}'
+```
+
+### 2. 单词管理
+
+所有单词管理接口都需要在请求头中提供 API Key：
+
+```
+X-API-Key: your-api-key
+# 或
+Authorization: Bearer your-api-key
+```
+
+#### 获取所有单词
+
+**GET** `/api/words`
+
+```bash
+curl -X GET https://your-domain.vercel.app/api/words \
+  -H "X-API-Key: your-api-key"
+```
+
+#### 获取单个单词
+
+**GET** `/api/words?word=hello`
+
+```bash
+curl -X GET "https://your-domain.vercel.app/api/words?word=hello" \
+  -H "X-API-Key: your-api-key"
+```
+
+#### 创建单词
+
+**POST** `/api/words`
+
+```bash
+curl -X POST https://your-domain.vercel.app/api/words \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "word": "hello",
+    "data": {
+      "lemma": "hello",
+      "pos": "interjection",
+      "family": ["hello", "hi", "greeting"]
+    }
+  }'
+```
+
+#### 更新单词
+
+**PUT** `/api/words`
+
+```bash
+curl -X PUT https://your-domain.vercel.app/api/words \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "word": "hello",
+    "data": {
+      "lemma": "hello",
+      "pos": "interjection",
+      "family": ["hello", "hi", "greeting", "hey"]
+    }
+  }'
+```
+
+#### 删除单词
+
+**DELETE** `/api/words`
+
+```bash
+curl -X DELETE https://your-domain.vercel.app/api/words \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"word": "hello"}'
+```
+
+## 🔒 账号隔离
+
+每个账号通过唯一的 API Key 进行身份验证，所有单词数据都按账号维度隔离。不同账号之间无法访问对方的单词数据。
+
+## 📦 本地开发
 
 ### 1. Fork 或下载本仓库
