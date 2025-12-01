@@ -27,18 +27,44 @@ npm install
 
 ### 2. 配置环境变量
 
-创建 `.env.local` 文件：
+**创建 `.env.local` 文件**（Next.js 会自动读取）：
+
+```bash
+# 在项目根目录创建 .env.local 文件
+touch .env.local
+```
+
+然后编辑 `.env.local` 文件，填入你的实际配置：
 
 ```env
-# 数据库连接
-DATABASE_URL=postgresql://user:password@host:port/database
+# 数据库连接字符串（必需）
+# 格式: postgresql://username:password@host:port/database
+# 
+# 本地 PostgreSQL 示例:
+DATABASE_URL=postgresql://postgres:password@localhost:5432/llm_api
+#
+# Neon 云数据库示例:
+# DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb
+#
+# Supabase 示例:
+# DATABASE_URL=postgresql://postgres:password@db.xxx.supabase.co:5432/postgres
 
-# OpenAI API Key
-OPENAI_API_KEY=sk-...
+# OpenAI API Key（必需）
+# 从 https://platform.openai.com/api-keys 获取
+OPENAI_API_KEY=sk-your-openai-api-key-here
 
-# 数据库初始化密钥（可选）
+# 数据库初始化密钥（可选，默认: dev-secret）
 INIT_DB_SECRET=dev-secret
 ```
+
+**获取数据库连接字符串：**
+
+- **本地 PostgreSQL**: `postgresql://postgres:password@localhost:5432/dbname`
+- **Neon** (推荐，免费): 在项目设置中获取连接字符串
+- **Supabase**: 在项目设置 > Database > Connection string 中获取
+- **Vercel Postgres**: 部署到 Vercel 后自动提供
+
+> 💡 **提示**: 查看 [SETUP_LOCAL.md](./SETUP_LOCAL.md) 获取详细的本地环境设置指南
 
 ### 3. 初始化数据库
 

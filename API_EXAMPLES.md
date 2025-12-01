@@ -56,6 +56,8 @@ console.log(data);
 
 ### 2. 创建账号
 
+#### 基本用法（自动生成 API Key）
+
 ```javascript
 // POST /api/accounts
 const response = await fetch('http://localhost:3000/api/accounts', {
@@ -65,7 +67,6 @@ const response = await fetch('http://localhost:3000/api/accounts', {
   },
   body: JSON.stringify({
     name: '我的账号' // 可选
-    // api_key: 'custom-key' // 可选，不提供则自动生成
   })
 });
 
@@ -84,6 +85,76 @@ console.log(data);
 // 保存 API Key 供后续使用
 const API_KEY = data.account.api_key;
 ```
+
+#### 自定义 API Key
+
+```javascript
+const response = await fetch('http://localhost:3000/api/accounts', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: '我的账号',
+    api_key: 'my-custom-api-key-12345' // 自定义 API Key
+  })
+});
+
+const data = await response.json();
+const API_KEY = data.account.api_key; // 将是你提供的 api_key
+```
+
+#### 无名称创建账号
+
+```javascript
+const response = await fetch('http://localhost:3000/api/accounts', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({}) // 不提供 name
+});
+
+const data = await response.json();
+// data.account.name 将为 null
+```
+
+#### 带错误处理
+
+```javascript
+try {
+  const response = await fetch('http://localhost:3000/api/accounts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: '我的账号'
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  console.log('账号创建成功:', data.account);
+  const API_KEY = data.account.api_key;
+} catch (error) {
+  console.error('创建账号失败:', error.message);
+}
+```
+
+#### 测试脚本
+
+运行测试脚本查看所有测试用例：
+
+```bash
+npm run test-create-account
+```
+
+或查看 `scripts/create-account-examples.js` 获取更多示例代码。
 
 ---
 
