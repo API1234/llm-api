@@ -17,6 +17,63 @@
 - ✅ 账号隔离（API Key 认证）
 - ✅ 单词 CRUD 操作（创建、读取、更新、删除）
 
+## 🚀 本地开发
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 配置环境变量
+
+创建 `.env.local` 文件：
+
+```env
+# 数据库连接
+DATABASE_URL=postgresql://user:password@host:port/database
+
+# OpenAI API Key
+OPENAI_API_KEY=sk-...
+
+# 数据库初始化密钥（可选）
+INIT_DB_SECRET=dev-secret
+```
+
+### 3. 初始化数据库
+
+```bash
+npm run init-db
+```
+
+或直接运行脚本：
+
+```bash
+node scripts/init-db.js
+```
+
+### 4. 启动开发服务器
+
+```bash
+npm run dev
+```
+
+服务器将在 `http://localhost:3000` 启动。
+
+### 5. 测试 API
+
+运行测试脚本（需要先启动开发服务器）：
+
+```bash
+npm run test-api
+```
+
+### 6. API 调用示例
+
+查看 [API_EXAMPLES.md](./API_EXAMPLES.md) 获取详细的 fetch 调用示例。
+
+---
+
 ## 🚀 部署到 Vercel
 
 ### 1. 配置数据库

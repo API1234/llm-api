@@ -5,7 +5,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "init-db": "node scripts/init-db.js",
+    "test-api": "node scripts/test-api.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
