@@ -18,7 +18,7 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * POST /api/word-analysis
- * 使用内部 Claude-4-sonnet 模型分析英语单词的词根和词族
+ * 使用内部通义千问模型分析英语单词的词根和词族
  * 
  * Body:
  * {
@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
 
 只返回 JSON 对象，不要包含其他文字说明。`;
 
-    // 使用 Claude-4-sonnet 模型生成分析结果
+    // 使用通义千问模型生成分析结果
     const result = await generateTextWithXhsModel(
-      'claude-4-sonnet',
+      'qwen3-235b-a22b',
       prompt,
       {
         maxTokens: 1000,

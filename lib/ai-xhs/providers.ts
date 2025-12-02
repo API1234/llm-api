@@ -6,8 +6,22 @@
 
 import { createOpenAI } from '@ai-sdk/openai';
 import { extractReasoningMiddleware, wrapLanguageModel } from 'ai';
-import { createAnthropic as createXhsAnthropic } from '@xhs/aws-anthropic';
 import type { XhsModelProvider } from './models';
+
+// 动态加载 @xhs/aws-anthropic（可选依赖，可能不存在）
+let createXhsAnthropic: ((config: { token: string }) => (modelId: string) => any) | null = null;
+let xhsAnthropicAvailable = false;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const xhsAnthropicModule = require('@xhs/aws-anthropic');
+  createXhsAnthropic = xhsAnthropicModule.createAnthropic;
+  xhsAnthropicAvailable = true;
+} catch (error) {
+  // 包不存在，这是正常的（例如在 Vercel 上部署时）
+  console.warn('[ai-xhs] @xhs/aws-anthropic 包不可用，xhs-anthropic 模型将无法使用:', error);
+  xhsAnthropicAvailable = false;
+}
 
 // 小红书内部 OpenAI 兼容 API
 // 注意：内部 API 使用标准的 /v1/chat/completions 端点，而不是新的 /v1/responses
@@ -22,19 +36,29 @@ const xhsProvider = createOpenAI({
 // 使用 @ai-sdk/openai + ai 库可以替代原生 openai 库的大部分功能
 export const xhsOpenAIProvider = xhsProvider;
 
-// 小红书内部 Anthropic API
-const xhsAnthropicProvider = createXhsAnthropic({
-  token: process.env.XHS_ANTHROPIC_API_KEY || '',
-});
-const claude37Sonnet = xhsAnthropicProvider('claude-3-7-sonnet-20250219');
-const claude4Sonnet = xhsAnthropicProvider('claude-4-sonnet-20250514');
+// 小红书内部 Anthropic API（仅在包可用时初始化）
+let xhsAnthropicProvider: ((modelId: string) => any) | null = null;
+let claude37Sonnet: any = null;
+let claude4Sonnet: any = null;
+
+if (xhsAnthropicAvailable && createXhsAnthropic) {
+  try {
+    xhsAnthropicProvider = createXhsAnthropic({
+      token: process.env.XHS_ANTHROPIC_API_KEY || '',
+    });
+    claude37Sonnet = xhsAnthropicProvider('claude-3-7-sonnet-20250219');
+    claude4Sonnet = xhsAnthropicProvider('claude-4-sonnet-20250514');
+  } catch (error) {
+    console.warn('[ai-xhs] 初始化 xhs-anthropic provider 失败:', error);
+  }
+}
 
 // 内部模型实例
 export const qwen3_235b = xhsProvider.chat('qwen3-235b-a22b');
 export const deepseek_v3_0324 = xhsProvider.chat('deepseek-v3-0324');
 export const deepseek_coder = xhsProvider.chat('deepseek-coder-33b-instruct');
 // deepseek-r1 支持 reasoning，使用 wrapLanguageModel 包装
-// 注意：AI SDK 4 中 wrapLanguageModel 的类型可能不兼容，使用 any 类型避免类型错误
+// AI SDK 5 已改进类型支持，但为兼容性仍使用 any
 export const deepseek_r1_xhs = wrapLanguageModel({
   model: xhsProvider.chat('deepseek-r1') as any,
   middleware: extractReasoningMiddleware({ tagName: 'think' }),
@@ -104,8 +128,9 @@ export const xhsChatModelMap: Record<string, any> = {
   'deepseek-v3-0324': deepseek_v3_0324,
   'deepseek-coder': deepseek_coder,
   'deepseek-r1-xhs': deepseek_r1_xhs,
-  'claude-3-7-sonnet': claude37Sonnet,
-  'claude-4-sonnet': claude4Sonnet,
+  // Anthropic 模型仅在包可用时添加
+  ...(claude37Sonnet && { 'claude-3-7-sonnet': claude37Sonnet }),
+  ...(claude4Sonnet && { 'claude-4-sonnet': claude4Sonnet }),
 };
 
 /**
@@ -138,6 +163,10 @@ export function isXhsModelAvailable(modelId: string): boolean {
   if (modelConfig.provider === 'xhs-openai') {
     return !!(process.env.XHS_API_KEY || process.env.XHS_API_BASE_URL);
   } else if (modelConfig.provider === 'xhs-anthropic') {
+    // 检查包是否可用
+    if (!xhsAnthropicAvailable) {
+      return false;
+    }
     return !!(process.env.XHS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
   }
   

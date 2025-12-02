@@ -48,14 +48,23 @@ export function createXhsModel(provider: XhsModelProvider, modelId: string) {
     }
     case 'xhs-anthropic': {
       // 创建内部 Anthropic provider
-      // 强制使用 @xhs/aws-anthropic（与 AI SDK 4 兼容）
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { createAnthropic: createXhsAnthropic } = require('@xhs/aws-anthropic');
-      const anthropicProvider = createXhsAnthropic({
-        token: config.token || config.apiKey,
-      });
-      
-      return anthropicProvider(modelId);
+      // 尝试动态加载 @xhs/aws-anthropic（可选依赖）
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { createAnthropic: createXhsAnthropic } = require('@xhs/aws-anthropic');
+        const anthropicProvider = createXhsAnthropic({
+          token: config.token || config.apiKey,
+        });
+        
+        return anthropicProvider(modelId);
+      } catch (error: any) {
+        // 包不存在或加载失败
+        throw new Error(
+          `@xhs/aws-anthropic 包不可用。该包仅在内部网络环境中可用。` +
+          `如果需要在 Vercel 等外部环境使用，请联系管理员配置私有 npm registry。` +
+          `原始错误: ${error.message}`
+        );
+      }
     }
     default:
       throw new Error(`Unsupported internal provider: ${provider}`);
@@ -110,15 +119,9 @@ export async function generateTextWithXhsModel(
     const result = await generateText(generateParams);
     return result;
   } catch (error: any) {
-    // 处理 v1 模型不兼容错误
-    if (error.message?.includes('UnsupportedModelVersionError') || 
-        error.message?.includes('Unsupported model version v1')) {
-      throw new Error(
-        `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
-        `Original error: ${error.message}`
-      );
-    }
+    // AI SDK 5 已经支持新的模型规范，不再需要处理 v1 兼容性错误
+    // 但保留错误处理以便调试
+    console.error(`[generateTextWithXhsModel] 生成文本失败 (${modelId}):`, error);
     throw error;
   }
 }
@@ -171,15 +174,9 @@ export async function streamTextWithXhsModel(
     const result = await streamText(streamParams);
     return result;
   } catch (error: any) {
-    // 处理 v1 模型不兼容错误
-    if (error.message?.includes('UnsupportedModelVersionError') || 
-        error.message?.includes('Unsupported model version v1')) {
-      throw new Error(
-        `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
-        `Original error: ${error.message}`
-      );
-    }
+    // AI SDK 5 已经支持新的模型规范，不再需要处理 v1 兼容性错误
+    // 但保留错误处理以便调试
+    console.error(`[streamTextWithXhsModel] 流式生成文本失败 (${modelId}):`, error);
     throw error;
   }
 }
