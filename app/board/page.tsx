@@ -86,6 +86,49 @@ export default function BoardPage() {
     fetchWords();
   }, [fetchWords]);
 
+  // 监听 Chrome 扩展消息，刷新单词列表
+  useEffect(() => {
+    // 检查是否在 Chrome 扩展环境中
+    if (typeof window !== 'undefined') {
+      const chromeObj = (window as any).chrome;
+      
+      // 方法1: 监听 chrome.runtime.onMessage（如果页面有 content script）
+      if (chromeObj && chromeObj.runtime && chromeObj.runtime.onMessage) {
+        const messageListener = (message: any) => {
+          if (message && message.type === 'refresh-words') {
+            console.log('收到刷新单词列表消息 (chrome.runtime)');
+            fetchWords();
+          }
+        };
+
+        chromeObj.runtime.onMessage.addListener(messageListener);
+
+        // 清理监听器
+        return () => {
+          if (chromeObj.runtime && chromeObj.runtime.onMessage) {
+            chromeObj.runtime.onMessage.removeListener(messageListener);
+          }
+        };
+      }
+
+      // 方法2: 监听 window.postMessage（作为备用方案）
+      const postMessageListener = (event: MessageEvent) => {
+        // 检查消息来源（可选：验证来源）
+        if (event.data && event.data.type === 'refresh-words' && event.data.source === 'chrome-extension') {
+          console.log('收到刷新单词列表消息 (postMessage)');
+          fetchWords();
+        }
+      };
+
+      window.addEventListener('message', postMessageListener);
+
+      // 清理监听器
+      return () => {
+        window.removeEventListener('message', postMessageListener);
+      };
+    }
+  }, [fetchWords]);
+
   // 过滤和排序单词
   const filteredAndSortedWords = words
     .filter((word) => {

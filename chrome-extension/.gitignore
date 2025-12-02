@@ -1,0 +1,7 @@
+# 编译后的 CSS 文件（由 Tailwind 生成）
+styles/popup.min.css
+
+# 开发文件
+*.log
+.DS_Store
+

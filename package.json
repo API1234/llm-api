@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "next lint",
     "init-db": "node scripts/init-db.js",
-    "postinstall": "echo 'Dependencies installed successfully'"
+    "postinstall": "echo 'Dependencies installed successfully'",
+    "build:chrome": "cd chrome-extension && npx tailwindcss -i ./styles/popup.css -o ./styles/popup.min.css --minify"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",

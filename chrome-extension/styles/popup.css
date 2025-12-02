@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 主题预设 */
+.theme-cyan { --tw-primary: #00e5ff; --tw-primary-pressed: #00bcd4; }
+.theme-purple { --tw-primary: #8b5cf6; --tw-primary-pressed: #7c3aed; }
+.theme-pink { --tw-primary: #ff4d8d; --tw-primary-pressed: #ff2f72; }
+.theme-green { --tw-primary: #00e676; --tw-primary-pressed: #00c853; }
+.theme-slate { --tw-primary: #60a5fa; --tw-primary-pressed: #3b82f6; }
+
+/* Switch 样式 */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #c7cdd6;
+  border-radius: 9999px;
+  transition: background 0.12s ease;
+}
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  top: 2px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.12s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, var(--tw-primary) 0%, var(--tw-primary-pressed) 100%);
+  box-shadow: inset 0 0 8px rgba(0, 229, 255, 0.35), 0 0 10px rgba(0, 229, 255, 0.35);
+}
+.switch input:checked + .switch-slider::before {
+  transform: translateX(20px);
+}
+
+/* 主题类应用 */
+.theme-cyan .switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, #00e5ff 0%, #00bcd4 100%);
+  box-shadow: inset 0 0 8px rgba(0, 229, 255, 0.35), 0 0 10px rgba(0, 229, 255, 0.35);
+}
+.theme-purple .switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  box-shadow: inset 0 0 8px rgba(139, 92, 246, 0.35), 0 0 10px rgba(139, 92, 246, 0.35);
+}
+.theme-pink .switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, #ff4d8d 0%, #ff2f72 100%);
+  box-shadow: inset 0 0 8px rgba(255, 77, 141, 0.35), 0 0 10px rgba(255, 77, 141, 0.35);
+}
+.theme-green .switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  box-shadow: inset 0 0 8px rgba(0, 230, 118, 0.35), 0 0 10px rgba(0, 230, 118, 0.35);
+}
+.theme-slate .switch input:checked + .switch-slider {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  box-shadow: inset 0 0 8px rgba(96, 165, 250, 0.35), 0 0 10px rgba(96, 165, 250, 0.35);
+}
+

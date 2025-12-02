@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>夜游神 Pualy</title>
+    <link rel="stylesheet" href="../styles/popup.min.css" />
+  </head>
+  <body class="bg-white dark:bg-[#0b0f14] text-gray-900 dark:text-gray-100 w-[340px] min-w-[320px] max-w-[420px]">
+    <div class="flex flex-col">
+      <!-- 操作按钮区域 -->
+      <div class="p-2.5 flex gap-2">
+        <button 
+          id="openBoard" 
+          class="flex-1 px-4 py-2 bg-gradient-to-br from-cyan-400 to-cyan-600 hover:from-cyan-500 hover:to-cyan-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+          title="打开词汇学习表"
+        >
+          词汇表
+        </button>
+      </div>
+
+      <!-- 设置列表 -->
+      <div class="px-2.5 pb-2.5 flex flex-col gap-2">
+        <!-- API Key 设置 -->
+        <div class="flex flex-col gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300">API Key</label>
+          <div class="flex gap-2">
+            <input 
+              id="apiKeyInput" 
+              type="password"
+              placeholder="输入 API Key"
+              class="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+            />
+            <button 
+              id="saveApiKeyBtn"
+              class="px-3 py-1.5 text-sm bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors"
+            >
+              保存
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400">用于保存单词到服务器</p>
+        </div>
+
+        <!-- 主题选择 -->
+        <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">主题</label>
+          <select 
+            id="themeSelect" 
+            class="w-40 px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+          >
+            <option value="cyan">电光青蓝</option>
+            <option value="purple">霓虹紫</option>
+            <option value="pink">赛博粉</option>
+            <option value="green">荧光绿</option>
+            <option value="slate">极夜蓝</option>
+          </select>
+        </div>
+
+        <!-- 去广告开关 -->
+        <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">去广告（阅读更纯净）</label>
+          <label class="switch">
+            <input id="switchAdblock" type="checkbox" />
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- 小红书自动登录开关 -->
+        <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">小红书自动登录</label>
+          <label class="switch">
+            <input id="switchXhs" type="checkbox" />
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <script src="../src/popup.js"></script>
+  </body>
+</html>
+
