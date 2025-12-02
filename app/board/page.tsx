@@ -8,7 +8,6 @@ import ClearAllModal from '@/components/ClearAllModal';
 import SentenceNoteModal from '@/components/SentenceNoteModal';
 import ReviewPanel from '@/components/ReviewPanel';
 import Select from '@/components/ui/Select';
-import { format } from 'date-fns';
 
 const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
   if (typeof window !== 'undefined' && (window as any).showToast) {
