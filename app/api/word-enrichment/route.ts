@@ -20,7 +20,7 @@ export async function OPTIONS(req: NextRequest) {
 /**
  * POST /api/word-enrichment
  * 使用大模型为单词生成词性、词根、词族、翻译和例句
- * 
+ *
  * Body:
  * {
  *   "word": "common"
@@ -32,10 +32,7 @@ export async function POST(req: NextRequest) {
     const { word } = body;
 
     if (!word) {
-      return NextResponse.json(
-        { error: 'Missing required field: "word"' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required field: "word"' }, { status: 400 });
     }
 
     if (typeof word !== 'string' || word.trim().length === 0) {
@@ -47,23 +44,25 @@ export async function POST(req: NextRequest) {
 
     const normalizedWord = word.trim().toLowerCase();
 
-    // 使用大模型生成完整的单词信息（词性、词根、词族、翻译和例句）
+    // 使用大模型生成完整的单词信息（包括音标、词性、词根、词族、翻译和例句）
     const comprehensivePrompt = `请全面分析英语单词 "${normalizedWord}"，提供以下信息：
 
 要求：
-1. 识别该单词的所有词性（part of speech），如 noun, verb, adjective, adverb 等
-2. 为每个词性提供：
+1. 提供该单词的音标（phonetic），使用国际音标（IPA）格式，例如：/ˈkɒmən/ 或 /ˈkɑːmən/
+2. 识别该单词的所有词性（part of speech），如 noun, verb, adjective, adverb 等
+3. 为每个词性提供：
    - 英文定义（definitions）
    - 中文翻译（多个翻译用分号分隔，如 "普遍的; 常见的"）
    - 1-2 个英文例句（例句中要包含单词 "${normalizedWord}"）
    - 每个例句的中文翻译
-3. 识别该单词的词根（root/etymology）和词根含义
-4. 列出该单词的词族（word family），包括同根词、派生词等
-5. 简要说明词根的含义和来源
+4. 识别该单词的词根（root/etymology）和词根含义
+5. 列出该单词的词族（word family），包括同根词、派生词等
+6. 简要说明词根的含义和来源
 
 请以 JSON 格式返回结果，格式如下：
 {
   "word": "${normalizedWord}",
+  "phonetic": "/ˈkɒmən/",
   "meanings": [
     {
       "partOfSpeech": "adjective",
@@ -96,18 +95,15 @@ export async function POST(req: NextRequest) {
 
 只返回 JSON 对象，不要包含其他文字说明。`;
 
-    const result = await generateTextWithXhsModel(
-      'qwen3-235b-a22b',
-      comprehensivePrompt,
-      {
-        maxTokens: 2000,
-        temperature: 0.3,
-      }
-    );
+    const result = await generateTextWithXhsModel('qwen3-235b-a22b', comprehensivePrompt, {
+      maxTokens: 2000,
+      temperature: 0.3,
+    });
 
     // 解析 JSON 响应
     let enrichmentData: {
       word?: string;
+      phonetic?: string;
       meanings?: Meaning[];
       root?: string;
       rootMeaning?: string;
@@ -125,11 +121,14 @@ export async function POST(req: NextRequest) {
       enrichmentData = JSON.parse(jsonText);
     } catch (parseError) {
       console.warn('Failed to parse enrichment JSON:', parseError);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to parse AI response',
-        rawResponse: result.text,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to parse AI response',
+          rawResponse: result.text,
+        },
+        { status: 500 }
+      );
     }
 
     // 验证和清理数据
@@ -141,9 +140,10 @@ export async function POST(req: NextRequest) {
             partOfSpeech: meaning.partOfSpeech,
             definitions: meaning.definitions,
             translation: meaning.translation || undefined,
-            examples: meaning.examples && Array.isArray(meaning.examples)
-              ? meaning.examples.slice(0, 2)
-              : undefined,
+            examples:
+              meaning.examples && Array.isArray(meaning.examples)
+                ? meaning.examples.slice(0, 2)
+                : undefined,
           });
         }
       }
@@ -152,26 +152,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       word: normalizedWord,
+      phonetic: enrichmentData.phonetic,
       meanings: meanings.length > 0 ? meanings : undefined,
       root: enrichmentData.root,
       rootMeaning: enrichmentData.rootMeaning,
-      wordFamily: enrichmentData.wordFamily && Array.isArray(enrichmentData.wordFamily) 
-        ? enrichmentData.wordFamily 
-        : [],
+      wordFamily:
+        enrichmentData.wordFamily && Array.isArray(enrichmentData.wordFamily)
+          ? enrichmentData.wordFamily
+          : [],
       explanation: enrichmentData.explanation,
     });
   } catch (error: any) {
     console.error('Error in word-enrichment endpoint:', error);
-    
+
     let errorMessage = error.message || 'Unknown error';
     let statusCode = 500;
-    
+
     if (errorMessage.includes('API Key not configured')) {
       statusCode = 400;
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: 'Failed to enrich word',
         details: errorMessage,
@@ -180,4 +182,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -176,49 +176,26 @@ export default function WordCard({
     try {
       const normalizedWord = word.word.toLowerCase();
 
-      // 并行调用两个接口：基础信息（音标、音频）和完整分析（词性、词根、词族、翻译、例句）
-      const [analyzeResponse, enrichmentResponse] = await Promise.allSettled([
-        fetch('/api/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ word: normalizedWord }),
-        }),
-        fetch('/api/word-enrichment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ word: normalizedWord }),
-        }),
-      ]);
+      // 调用大模型接口获取所有单词信息（包括音标）
+      const enrichmentResponse = await fetch('/api/word-enrichment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ word: normalizedWord }),
+      });
 
-      // 处理基础信息结果
-      let analyzeData = null;
-      if (analyzeResponse.status === 'fulfilled' && analyzeResponse.value.ok) {
-        analyzeData = await analyzeResponse.value.json();
-      } else {
-        console.warn('Failed to fetch word analysis');
-      }
-
-      // 处理完整分析结果
-      let enrichmentData = null;
-      if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
-        enrichmentData = await enrichmentResponse.value.json();
-      } else {
-        const error =
-          enrichmentResponse.status === 'rejected'
-            ? enrichmentResponse.reason
-            : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
+      if (!enrichmentResponse.ok) {
+        const error = await enrichmentResponse.json().catch(() => ({ error: '请求失败' }));
         throw new Error(error.message || error.error || '获取单词分析失败');
       }
 
-      // 更新单词数据（保留原有的例句和笔记）
+      const enrichmentData = await enrichmentResponse.json();
+
+      // 更新单词数据（保留原有的例句和笔记，所有信息都来自大模型）
       const updatedWordData = {
         id: word.id,
-        phonetic: analyzeData?.phonetic || word.phonetic,
-        audioUrl: analyzeData?.audioUrl || word.audioUrl,
+        phonetic: enrichmentData?.phonetic || word.phonetic,
         meanings: enrichmentData?.meanings || word.meanings,
         root: enrichmentData?.root || word.root,
         rootMeaning: enrichmentData?.rootMeaning || word.rootMeaning,
@@ -256,36 +233,12 @@ export default function WordCard({
 
   const normalizeSentenceKey = (s: string) => s.trim().toLowerCase();
 
-  // 播放发音
-  const handlePlayPronunciation = async () => {
+  // 播放发音（使用浏览器 TTS）
+  const handlePlayPronunciation = () => {
     if (isPlaying) return;
 
     setIsPlaying(true);
 
-    try {
-      // 优先使用音频 URL
-      if (word.audioUrl) {
-        const audio = new Audio(word.audioUrl);
-        audio.onended = () => setIsPlaying(false);
-        audio.onerror = () => {
-          setIsPlaying(false);
-          // 如果音频 URL 失败，回退到 TTS
-          playWithTTS();
-        };
-        await audio.play();
-      } else {
-        // 使用浏览器的 Text-to-Speech API
-        playWithTTS();
-      }
-    } catch (error) {
-      console.error('Error playing pronunciation:', error);
-      // 如果播放失败，尝试使用 TTS
-      playWithTTS();
-    }
-  };
-
-  // 使用 Text-to-Speech API 播放
-  const playWithTTS = () => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(word.word);
       utterance.lang = 'en-US';
@@ -294,7 +247,10 @@ export default function WordCard({
       utterance.volume = 1;
 
       utterance.onend = () => setIsPlaying(false);
-      utterance.onerror = () => setIsPlaying(false);
+      utterance.onerror = () => {
+        setIsPlaying(false);
+        showToast('播放失败，请重试', 'error');
+      };
 
       window.speechSynthesis.speak(utterance);
     } else {

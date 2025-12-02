@@ -41,51 +41,29 @@ export default function AddWordModal({ show, onClose, onSuccess }: AddWordModalP
     try {
       const normalizedWord = word.trim().toLowerCase();
 
-      // 并行调用两个接口：基础信息（音标、音频）和完整分析（词性、词根、词族、翻译、例句）
-      const [analyzeResponse, enrichmentResponse] = await Promise.allSettled([
-        fetch('/api/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ word: normalizedWord }),
-        }),
-        fetch('/api/word-enrichment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ word: normalizedWord }),
-        }),
-      ]);
+      // 调用大模型接口获取所有单词信息（包括音标）
+      const enrichmentResponse = await fetch('/api/word-enrichment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ word: normalizedWord }),
+      });
 
-      // 处理基础信息结果
-      let analyzeData = null;
-      if (analyzeResponse.status === 'fulfilled' && analyzeResponse.value.ok) {
-        analyzeData = await analyzeResponse.value.json();
-      } else {
-        console.warn('Failed to fetch word analysis');
-      }
-
-      // 处理完整分析结果
-      let enrichmentData = null;
-      if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
-        enrichmentData = await enrichmentResponse.value.json();
-      } else {
-        const error = enrichmentResponse.status === 'rejected'
-          ? enrichmentResponse.reason
-          : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
+      if (!enrichmentResponse.ok) {
+        const error = await enrichmentResponse.json().catch(() => ({ error: '请求失败' }));
         throw new Error(error.message || error.error || '获取单词分析失败');
       }
 
-      // 构建单词数据
+      const enrichmentData = await enrichmentResponse.json();
+
+      // 构建单词数据（所有信息都来自大模型）
       const wordData: WordRequest = {
         word: normalizedWord,
         url: typeof window !== 'undefined' ? window.location.href : '',
         title: typeof document !== 'undefined' ? document.title : '',
         sentences: [],
-        phonetic: analyzeData?.phonetic,
-        audioUrl: analyzeData?.audioUrl,
+        phonetic: enrichmentData?.phonetic,
         meanings: enrichmentData?.meanings,
         root: enrichmentData?.root,
         rootMeaning: enrichmentData?.rootMeaning,
@@ -157,4 +135,3 @@ export default function AddWordModal({ show, onClose, onSuccess }: AddWordModalP
     </Modal>
   );
 }
-
