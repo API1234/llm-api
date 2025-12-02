@@ -1,6 +1,9 @@
 # 编译后的 CSS 文件（由 Tailwind 生成）
 styles/popup.min.css
 
+# Chrome 扩展自动生成的元数据目录
+_metadata/
+
 # 开发文件
 *.log
 .DS_Store
