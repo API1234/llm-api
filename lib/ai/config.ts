@@ -9,6 +9,7 @@ export interface ApiKeyConfig {
   provider: ModelProvider;
   apiKey: string;
   baseUrl?: string; // 可选的自定义 base URL
+  token?: string; // 用于 Anthropic（某些实现使用 token 而不是 apiKey）
 }
 
 /**
@@ -75,11 +76,21 @@ export function getApiKeyConfig(provider: ModelProvider): ApiKeyConfig | null {
     return null;
   }
 
-  return {
+  const config: ApiKeyConfig = {
     provider,
     apiKey,
-    // 可以添加自定义 base URL（如果需要）
-    baseUrl: process.env[`${provider.toUpperCase()}_BASE_URL`] || undefined,
   };
+
+  // 对于 openai，只有在明确设置了 OPENAI_BASE_URL 时才使用自定义 baseURL
+  // 否则使用默认的官方 OpenAI API (https://api.openai.com/v1)
+  if (provider === 'openai') {
+    const customBaseUrl = process.env.OPENAI_BASE_URL;
+    if (customBaseUrl) {
+      config.baseUrl = customBaseUrl;
+    }
+    // 如果不设置 baseUrl，@ai-sdk/openai 会使用默认的官方 API
+  }
+
+  return config;
 }
 

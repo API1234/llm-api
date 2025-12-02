@@ -44,7 +44,11 @@ export function createModel(provider: ModelProvider, modelId: string) {
     }
     case 'openai': {
       // 创建 OpenAI provider，然后调用 provider(modelId)
-      const openaiProvider = createOpenAI({ apiKey: config.apiKey });
+      // 只有在明确设置了 baseURL 时才传递，否则使用默认的官方 API
+      const openaiProvider = createOpenAI({
+        apiKey: config.apiKey,
+        ...(config.baseUrl && { baseURL: config.baseUrl }),
+      });
       return openaiProvider(modelId);
     }
     default:
@@ -69,6 +73,7 @@ export async function generateTextWithModel(
     throw new Error(`Unsupported model: ${modelId}`);
   }
 
+  // 创建模型实例（仅支持外部模型）
   const model = createModel(modelConfig.provider, modelId);
 
   // 构建参数对象（使用 any 类型避免类型检查问题）
@@ -88,9 +93,21 @@ export async function generateTextWithModel(
     generateParams.topP = options.topP;
   }
 
-  const result = await generateText(generateParams);
-
-  return result;
+  try {
+    const result = await generateText(generateParams);
+    return result;
+  } catch (error: any) {
+    // 处理 v1 模型不兼容错误
+    if (error.message?.includes('UnsupportedModelVersionError') || 
+        error.message?.includes('Unsupported model version v1')) {
+      throw new Error(
+        `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
+        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
+        `Original error: ${error.message}`
+      );
+    }
+    throw error;
+  }
 }
 
 /**
@@ -110,6 +127,7 @@ export async function streamTextWithModel(
     throw new Error(`Unsupported model: ${modelId}`);
   }
 
+  // 创建模型实例（仅支持外部模型）
   const model = createModel(modelConfig.provider, modelId);
 
   // 构建参数对象，使用展开运算符传递 settings
@@ -130,8 +148,20 @@ export async function streamTextWithModel(
     streamParams.topP = options.topP;
   }
 
-  const result = await streamText(streamParams);
-
-  return result;
+  try {
+    const result = await streamText(streamParams);
+    return result;
+  } catch (error: any) {
+    // 处理 v1 模型不兼容错误
+    if (error.message?.includes('UnsupportedModelVersionError') || 
+        error.message?.includes('Unsupported model version v1')) {
+      throw new Error(
+        `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
+        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
+        `Original error: ${error.message}`
+      );
+    }
+    throw error;
+  }
 }
 

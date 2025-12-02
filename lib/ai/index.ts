@@ -1,5 +1,7 @@
 /**
  * AI 模型框架统一导出
+ * 仅包含外部模型（Anthropic、OpenAI）
+ * 内部模型请使用 @/lib/ai-xhs
  */
 
 // 模型管理

@@ -177,20 +177,73 @@ const getApiKey = async () => {
   return apiKey || "";
 };
 
-// 调用 API 分析单词
+// 调用 API 分析单词（获取基础信息和词根词族）
 const analyzeWord = async (word) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ word }),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+    // 并行调用两个接口
+    const [analyzeResponse, wordAnalysisResponse] = await Promise.allSettled([
+      // 获取基础信息（音标、释义等）
+      fetch(`${API_BASE_URL}/api/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ word }),
+      }),
+      // 获取词根和词族
+      fetch(`${API_BASE_URL}/api/word-analysis`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ word }),
+      }),
+    ]);
+
+    // 处理基础信息结果
+    let analyzeData = null;
+    if (analyzeResponse.status === 'fulfilled' && analyzeResponse.value.ok) {
+      analyzeData = await analyzeResponse.value.json();
+    } else {
+      console.warn("Failed to fetch word analysis from /api/analyze:", 
+        analyzeResponse.status === 'rejected' ? analyzeResponse.reason : 'Request failed');
     }
-    return await response.json();
+
+    // 处理词根和词族结果
+    let wordAnalysisData = null;
+    if (wordAnalysisResponse.status === 'fulfilled' && wordAnalysisResponse.value.ok) {
+      wordAnalysisData = await wordAnalysisResponse.value.json();
+    } else {
+      console.warn("Failed to fetch word analysis from /api/word-analysis:", 
+        wordAnalysisResponse.status === 'rejected' ? wordAnalysisResponse.reason : 'Request failed');
+    }
+
+    // 合并两个接口的结果
+    // 合并 relatedWords：来自 analyze 的 relatedWords + 来自 word-analysis 的 wordFamily
+    const relatedWordsFromAnalyze = analyzeData?.relatedWords || [];
+    const wordFamilyFromAnalysis = wordAnalysisData?.wordFamily || [];
+    const mergedRelatedWords = [
+      ...relatedWordsFromAnalyze,
+      ...wordFamilyFromAnalysis.filter(w => w && w.toLowerCase() !== word.toLowerCase())
+    ]
+      .map(w => w.toLowerCase()) // 统一转小写
+      .filter((v, i, a) => a.indexOf(v) === i) // 去重
+      .slice(0, 20); // 限制最多20个
+
+    const mergedResult = {
+      // 基础信息（来自 /api/analyze）
+      phonetic: analyzeData?.phonetic,
+      audioUrl: analyzeData?.audioUrl,
+      meanings: analyzeData?.meanings,
+      // 词根和词族（来自 /api/word-analysis）
+      root: wordAnalysisData?.root,
+      rootMeaning: wordAnalysisData?.rootMeaning,
+      explanation: wordAnalysisData?.explanation,
+      // 合并后的关联词列表
+      relatedWords: mergedRelatedWords.length > 0 ? mergedRelatedWords : undefined,
+    };
+
+    return mergedResult;
   } catch (error) {
     console.error("Failed to analyze word:", error);
     return null;
@@ -250,15 +303,27 @@ const checkWordExists = async (apiKey, word) => {
         "X-API-Key": apiKey,
       },
     });
+    
+    // 404 表示单词不存在，这是正常情况
     if (response.status === 404) {
       return null; // 单词不存在
     }
+    
+    // 401 表示认证失败，需要处理
+    if (response.status === 401) {
+      console.warn(`[checkWordExists] 认证失败，请检查 API Key`);
+      return null; // 认证失败时也返回 null，避免阻塞流程
+    }
+    
+    // 其他错误
     if (!response.ok) {
+      console.warn(`[checkWordExists] 请求失败: ${response.status}`);
       return null; // 其他错误，假设不存在
     }
+    
     return await response.json();
   } catch (error) {
-    console.error("Failed to check word:", error);
+    console.error("[checkWordExists] 请求异常:", error);
     return null;
   }
 };

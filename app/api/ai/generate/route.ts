@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateTextWithModel, getModelConfig } from '@/lib/ai';
+import { generateTextWithXhsModel, getXhsModelConfig } from '@/lib/ai-xhs';
 
 /**
  * POST /api/ai/generate
@@ -17,9 +18,12 @@ import { generateTextWithModel, getModelConfig } from '@/lib/ai';
  * }
  */
 export async function POST(req: NextRequest) {
+  let modelId: string | undefined;
+  
   try {
     const body = await req.json();
-    const { modelId, prompt, options } = body;
+    modelId = body.modelId;
+    const { prompt, options } = body;
 
     // 验证必需参数
     if (!modelId) {
@@ -36,22 +40,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 验证模型是否支持
-    const modelConfig = getModelConfig(modelId);
+    // 验证模型是否支持（先检查外部模型，再检查内部模型）
+    let modelConfig = getModelConfig(modelId);
+    let isXhsModel = false;
+    
     if (!modelConfig) {
-      return NextResponse.json(
-        { error: `Unsupported model: ${modelId}` },
-        { status: 400 }
-      );
+      // 尝试检查是否为内部模型
+      const xhsModelConfig = getXhsModelConfig(modelId);
+      if (xhsModelConfig) {
+        isXhsModel = true;
+      } else {
+        return NextResponse.json(
+          { error: `Unsupported model: ${modelId}` },
+          { status: 400 }
+        );
+      }
     }
 
-    // 生成文本
-    const result = await generateTextWithModel(modelId, prompt, options);
+    // 生成文本（根据模型类型选择不同的生成函数）
+    const result = isXhsModel
+      ? await generateTextWithXhsModel(modelId, prompt, options)
+      : await generateTextWithModel(modelId, prompt, options);
 
+    // 获取模型配置信息
+    const finalModelConfig = isXhsModel ? getXhsModelConfig(modelId) : modelConfig;
+    
     return NextResponse.json({
       success: true,
       model: modelId,
-      provider: modelConfig.provider,
+      provider: finalModelConfig?.provider || 'unknown',
       text: result.text,
       usage: result.usage,
       finishReason: result.finishReason,
@@ -86,7 +103,7 @@ export async function POST(req: NextRequest) {
       { 
         error: 'Failed to generate text',
         details: errorMessage,
-        model: modelId,
+        model: modelId || 'unknown',
         hint: 'The model may not exist, you may not have access to it, or the model ID may be incorrect. Try using a different model.',
       },
       { status: statusCode }
