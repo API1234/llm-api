@@ -7,6 +7,7 @@ import AddWordModal from '@/components/AddWordModal';
 import ClearAllModal from '@/components/ClearAllModal';
 import SentenceNoteModal from '@/components/SentenceNoteModal';
 import ReviewPanel from '@/components/ReviewPanel';
+import Select from '@/components/ui/Select';
 import { format } from 'date-fns';
 
 const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -350,16 +351,18 @@ export default function BoardPage() {
                   className="input w-full"
                 />
               </div>
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="input w-[180px]"
-              >
-                <option value="time_desc">添加时间：新→旧</option>
-                <option value="time_asc">添加时间：旧→新</option>
-                <option value="alpha_asc">首字母：A→Z</option>
-                <option value="alpha_desc">首字母：Z→A</option>
-              </select>
+              <div className="w-[180px]">
+                <Select
+                  value={sortOption}
+                  onChange={(value) => setSortOption(value as SortOption)}
+                  options={[
+                    { value: 'time_desc', label: '添加时间：新→旧' },
+                    { value: 'time_asc', label: '添加时间：旧→新' },
+                    { value: 'alpha_asc', label: '首字母：A→Z' },
+                    { value: 'alpha_desc', label: '首字母：Z→A' },
+                  ]}
+                />
+              </div>
               <button 
                 onClick={() => setShowAddModal(true)} 
                 className="btn btn-primary whitespace-nowrap"
