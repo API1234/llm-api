@@ -264,17 +264,43 @@ const checkWordExists = async (apiKey, word) => {
 };
 
 // 通知 board 页面刷新单词列表
-const notifyBoardRefresh = async () => {
+const notifyBoardRefresh = async (sourceTabId) => {
   try {
-    // 查找所有打开的 board 页面标签
-    const boardUrl = `${API_BASE_URL}/board`;
-    const tabs = await chrome.tabs.query({ url: `${boardUrl}*` });
+    console.log("[notifyBoardRefresh] 开始通知 board 页面刷新");
     
+    // 查找所有打开的 board 页面标签
+    // 支持生产环境和本地开发环境
+    const boardUrlPatterns = [
+      `${API_BASE_URL}/board`,           // 生产环境
+      'http://localhost:3000/board',     // 本地开发环境
+      'http://127.0.0.1:3000/board',     // 本地开发环境（IP 地址）
+    ];
+    
+    const allTabs = await chrome.tabs.query({});
+    const boardTabs = allTabs.filter(tab => {
+      if (!tab.url) return false;
+      const url = tab.url.toLowerCase();
+      // 检查是否匹配任何 board URL 模式
+      return boardUrlPatterns.some(pattern => url.startsWith(pattern.toLowerCase())) ||
+             url.includes('/board'); // 兜底：包含 /board 路径
+    });
+    
+    console.log("[notifyBoardRefresh] 找到的 board 标签页:", boardTabs.length, boardTabs.map(t => t.url));
+
+    if (boardTabs.length === 0) {
+      console.log("[notifyBoardRefresh] 没有找到 board 页面，跳过通知");
+      return; // 如果没有打开的 board 页面，静默返回，不显示 toast
+    }
+
     // 向所有 board 页面发送刷新消息
-    for (const tab of tabs) {
+    let successCount = 0;
+    for (const tab of boardTabs) {
       if (tab.id) {
         try {
+          // 先尝试直接发送消息（如果页面有 content script）
           await chrome.tabs.sendMessage(tab.id, { type: "refresh-words" });
+          console.log(`[notifyBoardRefresh] 成功通过 sendMessage 通知标签页 ${tab.id}`);
+          successCount++;
         } catch (e) {
           // 如果标签页没有加载 content script，尝试注入脚本
           try {
@@ -283,16 +309,22 @@ const notifyBoardRefresh = async () => {
               func: () => {
                 // 通过 window.postMessage 发送消息，因为 content script 可能未加载
                 window.postMessage({ type: "refresh-words", source: "chrome-extension" }, "*");
+                console.log("[notifyBoardRefresh] 通过 postMessage 发送刷新消息");
               },
             });
+            console.log(`[notifyBoardRefresh] 成功通过 executeScript 通知标签页 ${tab.id}`);
+            successCount++;
           } catch (err) {
-            console.log("Failed to notify board page:", err);
+            console.error(`[notifyBoardRefresh] 通知标签页 ${tab.id} 失败:`, err);
           }
         }
       }
     }
+    
+    console.log(`[notifyBoardRefresh] 完成，成功通知 ${successCount}/${boardTabs.length} 个标签页`);
   } catch (error) {
-    console.error("Failed to notify board refresh:", error);
+    console.error("[notifyBoardRefresh] 发生错误:", error);
+    // 不显示 toast，避免干扰用户
   }
 };
 
@@ -340,7 +372,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
       await saveWordToAPI(apiKey, wordData);
       await sendToast(tabId, "已保存到词汇表");
       // 通知 board 页面刷新
-      await notifyBoardRefresh();
+      await notifyBoardRefresh(tabId);
     } catch (error) {
       console.error("Failed to save word:", error);
       await sendToast(tabId, `保存失败: ${error.message}`);
@@ -382,7 +414,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
       });
       await sendToast(tabId, `例句已添加到 ${matchedWord.word}`);
       // 通知 board 页面刷新
-      await notifyBoardRefresh();
+      await notifyBoardRefresh(tabId);
     } catch (error) {
       console.error("Failed to update word:", error);
       await sendToast(tabId, `更新失败: ${error.message}`);
@@ -417,7 +449,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
         });
         await sendToast(tabId, `例句已添加到 ${existingPicked.word}`);
         // 通知 board 页面刷新
-        await notifyBoardRefresh();
+        await notifyBoardRefresh(tabId);
       } catch (error) {
         console.error("Failed to update word:", error);
         await sendToast(tabId, `更新失败: ${error.message}`);
@@ -445,7 +477,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
       await saveWordToAPI(apiKey, wordData);
       await sendToast(tabId, `已保存到词汇表，并将例句关联到 ${pickedWord}`);
       // 通知 board 页面刷新
-      await notifyBoardRefresh();
+      await notifyBoardRefresh(tabId);
     } catch (error) {
       console.error("Failed to save word:", error);
       await sendToast(tabId, `保存失败: ${error.message}`);
