@@ -118,6 +118,7 @@ export interface WordRequest {
   audioUrl?: string;              // 可选：音频 URL
   meanings?: Meaning[];           // 可选：释义数组
   root?: string;                  // 可选：词根
+  rootMeaning?: string;           // 可选：词根含义
   relatedWords?: string[];        // 可选：关联词列表
   sentences: string[];            // 必需：例句数组
   notes?: {                       // 可选：例句解析

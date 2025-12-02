@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
       audioUrl: body.audioUrl,
       meanings: body.meanings,
       root: body.root,
+      rootMeaning: body.rootMeaning,
       relatedWords: body.relatedWords,
       sentences: body.sentences,
       notes: body.notes,
