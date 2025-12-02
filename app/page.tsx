@@ -6,6 +6,14 @@ export default function Home() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [selectedModel, setSelectedModel] = useState<string>('claude-3-7-sonnet');
+  
+  // 单词分析测试相关状态
+  const [wordInput, setWordInput] = useState<string>('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeResult, setAnalyzeResult] = useState<{
+    basicInfo: any;
+    wordAnalysis: any;
+  } | null>(null);
 
   // 内部模型列表
   const xhsModels = [
@@ -65,6 +73,71 @@ export default function Home() {
     }
   };
 
+  const handleAnalyzeWord = async () => {
+    if (!wordInput.trim()) {
+      alert('请输入单词');
+      return;
+    }
+
+    setAnalyzing(true);
+    setAnalyzeResult(null);
+
+    try {
+      // 并行调用两个接口
+      const [basicInfoResponse, wordAnalysisResponse] = await Promise.allSettled([
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ word: wordInput.trim() }),
+        }),
+        fetch('/api/word-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ word: wordInput.trim() }),
+        }),
+      ]);
+
+      let basicInfo = null;
+      let wordAnalysis = null;
+
+      // 处理基础信息结果
+      if (basicInfoResponse.status === 'fulfilled' && basicInfoResponse.value.ok) {
+        basicInfo = await basicInfoResponse.value.json();
+      } else {
+        const error = basicInfoResponse.status === 'rejected' 
+          ? basicInfoResponse.reason 
+          : await basicInfoResponse.value.json().catch(() => ({ error: '请求失败' }));
+        basicInfo = { error: error.message || error.error || '获取基础信息失败' };
+      }
+
+      // 处理词根词族分析结果
+      if (wordAnalysisResponse.status === 'fulfilled' && wordAnalysisResponse.value.ok) {
+        wordAnalysis = await wordAnalysisResponse.value.json();
+      } else {
+        const error = wordAnalysisResponse.status === 'rejected'
+          ? wordAnalysisResponse.reason
+          : await wordAnalysisResponse.value.json().catch(() => ({ error: '请求失败' }));
+        wordAnalysis = { error: error.message || error.error || '获取词根词族分析失败' };
+      }
+
+      setAnalyzeResult({
+        basicInfo,
+        wordAnalysis,
+      });
+    } catch (error: any) {
+      setAnalyzeResult({
+        basicInfo: { error: '请求异常', details: error.message },
+        wordAnalysis: { error: '请求异常', details: error.message },
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   return (
     <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>🧠 Word Analyzer API</h1>
@@ -90,6 +163,113 @@ export default function Home() {
       <p style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
         支持 Anthropic Claude 和 OpenAI 模型，API Key 通过环境变量配置
       </p>
+
+      <h2 style={{ marginTop: '2rem' }}>📖 单词分析接口测试</h2>
+      <div style={{ 
+        marginTop: '1rem', 
+        padding: '1.5rem', 
+        border: '1px solid #ddd', 
+        borderRadius: '8px',
+        backgroundColor: '#f9f9f9'
+      }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            输入单词：
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              value={wordInput}
+              onChange={(e) => setWordInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !analyzing) {
+                  handleAnalyzeWord();
+                }
+              }}
+              placeholder="例如: world, test, hello"
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+              disabled={analyzing}
+            />
+            <button
+              onClick={handleAnalyzeWord}
+              disabled={analyzing || !wordInput.trim()}
+              style={{
+                padding: '0.5rem 1.5rem',
+                fontSize: '1rem',
+                backgroundColor: analyzing || !wordInput.trim() ? '#ccc' : '#0070f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: analyzing || !wordInput.trim() ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+              }}
+            >
+              {analyzing ? '分析中...' : '🔍 分析单词'}
+            </button>
+          </div>
+        </div>
+
+        {analyzeResult && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>分析结果</h3>
+            
+            {/* 基础信息 */}
+            <div style={{ 
+              marginBottom: '1rem',
+              padding: '1rem', 
+              borderRadius: '4px',
+              backgroundColor: 'white',
+              border: '1px solid #ddd',
+            }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#333' }}>
+                1. 单词基础信息 (来自 /api/analyze)
+              </h4>
+              <pre style={{
+                margin: 0,
+                padding: '0.75rem',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                overflow: 'auto',
+                fontSize: '0.85rem',
+                lineHeight: '1.5',
+                maxHeight: '400px',
+              }}>
+                {JSON.stringify(analyzeResult.basicInfo, null, 2)}
+              </pre>
+            </div>
+
+            {/* 词根词族分析 */}
+            <div style={{ 
+              padding: '1rem', 
+              borderRadius: '4px',
+              backgroundColor: 'white',
+              border: '1px solid #ddd',
+            }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#333' }}>
+                2. 词根词族分析 (来自 /api/word-analysis)
+              </h4>
+              <pre style={{
+                margin: 0,
+                padding: '0.75rem',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                overflow: 'auto',
+                fontSize: '0.85rem',
+                lineHeight: '1.5',
+                maxHeight: '400px',
+              }}>
+                {JSON.stringify(analyzeResult.wordAnalysis, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
 
       <h2 style={{ marginTop: '2rem' }}>🧪 内部模型快速测试</h2>
       <div style={{ 
