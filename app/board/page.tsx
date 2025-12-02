@@ -95,9 +95,9 @@ export default function BoardPage() {
   // 监听 Chrome 扩展消息，刷新单词列表
   useEffect(() => {
     if (!mounted) return; // 等待客户端挂载
-    
+
     console.log('[Board] 设置刷新监听器');
-    
+
     // 使用防抖，避免重复刷新
     let refreshTimeout: NodeJS.Timeout | null = null;
     const handleRefresh = () => {
@@ -110,7 +110,7 @@ export default function BoardPage() {
         refreshTimeout = null;
       }, 100); // 100ms 防抖，合并短时间内多次刷新请求
     };
-    
+
     // 只监听 window.postMessage（content script 会转发消息）
     const postMessageListener = (event: MessageEvent) => {
       // 检查消息来源
@@ -120,7 +120,7 @@ export default function BoardPage() {
       }
     };
     window.addEventListener('message', postMessageListener);
-    
+
     return () => {
       window.removeEventListener('message', postMessageListener);
       if (refreshTimeout) {
@@ -302,13 +302,8 @@ export default function BoardPage() {
         {/* API Key 提示 - 只在客户端渲染 */}
         {mounted && !hasApiKey && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
-            <p className="text-yellow-800">
-              ⚠️ 请先设置 API Key 才能使用词汇表功能。
-            </p>
-            <a
-              href="/settings"
-              className="btn btn-primary ml-4 whitespace-nowrap"
-            >
+            <p className="text-yellow-800">⚠️ 请先设置 API Key 才能使用词汇表功能。</p>
+            <a href="/settings" className="btn btn-primary ml-4 whitespace-nowrap">
               前往设置
             </a>
           </div>
@@ -321,9 +316,7 @@ export default function BoardPage() {
               key={tab}
               onClick={() => setCurrentTab(tab)}
               className={`px-6 py-3 font-semibold transition-all duration-200 relative ${
-                currentTab === tab
-                  ? 'text-cyan-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                currentTab === tab ? 'text-cyan-600' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               {tab === 'all' && '全部'}
@@ -362,22 +355,22 @@ export default function BoardPage() {
                   ]}
                 />
               </div>
-              <button 
-                onClick={() => setShowAddModal(true)} 
+              <button
+                onClick={() => setShowAddModal(true)}
                 className="btn btn-primary whitespace-nowrap"
                 disabled={mounted && !hasApiKey}
               >
                 ➕ 新增单词
               </button>
-              <button 
-                onClick={handleExport} 
+              <button
+                onClick={handleExport}
                 className="btn btn-secondary whitespace-nowrap"
                 disabled={words.length === 0}
               >
                 📥 导出词库
               </button>
-              <button 
-                onClick={() => setShowClearModal(true)} 
+              <button
+                onClick={() => setShowClearModal(true)}
                 className="btn btn-danger whitespace-nowrap"
                 disabled={words.length === 0 || (mounted && !hasApiKey)}
               >
@@ -519,4 +512,3 @@ export default function BoardPage() {
     </div>
   );
 }
-
