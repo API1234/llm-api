@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateTextWithXhsModel } from '@/lib/ai-xhs';
 
 /**
+ * OPTIONS /api/word-analysis
+ * 处理 CORS 预检请求
+ */
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
+/**
  * POST /api/word-analysis
  * 使用内部 Claude-4-sonnet 模型分析英语单词的词根和词族
  * 

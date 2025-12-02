@@ -177,13 +177,36 @@ const getApiKey = async () => {
   return apiKey || "";
 };
 
-// 调用 API 分析单词（获取基础信息和词根词族）
-const analyzeWord = async (word) => {
+// 根据当前标签页 URL 动态获取 API Base URL
+const getApiBaseUrl = async (tabId) => {
   try {
+    if (tabId) {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab && tab.url) {
+        const url = new URL(tab.url);
+        // 如果当前页面是 localhost，使用本地 API
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+          return 'http://localhost:3000';
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[getApiBaseUrl] 无法获取标签页信息，使用默认 API URL:', error);
+  }
+  // 默认使用生产环境
+  return API_BASE_URL;
+};
+
+// 调用 API 分析单词（获取基础信息和词根词族）
+const analyzeWord = async (word, tabId = null) => {
+  try {
+    // 根据当前标签页动态获取 API Base URL
+    const apiBaseUrl = await getApiBaseUrl(tabId);
+    
     // 并行调用两个接口
     const [analyzeResponse, wordAnalysisResponse] = await Promise.allSettled([
       // 获取基础信息（音标、释义等）
-      fetch(`${API_BASE_URL}/api/analyze`, {
+      fetch(`${apiBaseUrl}/api/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -191,7 +214,7 @@ const analyzeWord = async (word) => {
         body: JSON.stringify({ word }),
       }),
       // 获取词根和词族
-      fetch(`${API_BASE_URL}/api/word-analysis`, {
+      fetch(`${apiBaseUrl}/api/word-analysis`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -251,9 +274,12 @@ const analyzeWord = async (word) => {
 };
 
 // 调用 API 保存单词
-const saveWordToAPI = async (apiKey, wordData) => {
+const saveWordToAPI = async (apiKey, wordData, tabId = null) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/words`, {
+    // 根据当前标签页动态获取 API Base URL
+    const apiBaseUrl = await getApiBaseUrl(tabId);
+    
+    const response = await fetch(`${apiBaseUrl}/api/words`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -273,9 +299,12 @@ const saveWordToAPI = async (apiKey, wordData) => {
 };
 
 // 调用 API 更新单词（添加例句）
-const updateWordInAPI = async (apiKey, wordId, wordData) => {
+const updateWordInAPI = async (apiKey, wordId, wordData, tabId = null) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/words`, {
+    // 根据当前标签页动态获取 API Base URL
+    const apiBaseUrl = await getApiBaseUrl(tabId);
+    
+    const response = await fetch(`${apiBaseUrl}/api/words`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -295,9 +324,12 @@ const updateWordInAPI = async (apiKey, wordId, wordData) => {
 };
 
 // 调用 API 检查单词是否存在
-const checkWordExists = async (apiKey, word) => {
+const checkWordExists = async (apiKey, word, tabId = null) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/words?word=${encodeURIComponent(word)}`, {
+    // 根据当前标签页动态获取 API Base URL
+    const apiBaseUrl = await getApiBaseUrl(tabId);
+    
+    const response = await fetch(`${apiBaseUrl}/api/words?word=${encodeURIComponent(word)}`, {
       method: "GET",
       headers: {
         "X-API-Key": apiKey,
@@ -358,26 +390,27 @@ const notifyBoardRefresh = async (sourceTabId) => {
     }
 
     // 向所有 board 页面发送刷新消息
+    // 只使用 sendMessage，content script 会转发到页面，避免重复发送
     let successCount = 0;
     for (const tab of boardTabs) {
       if (tab.id) {
         try {
-          // 先尝试直接发送消息（如果页面有 content script）
+          // 只使用 sendMessage，content script 会接收并转发到页面
           await chrome.tabs.sendMessage(tab.id, { type: "refresh-words" });
           console.log(`[notifyBoardRefresh] 成功通过 sendMessage 通知标签页 ${tab.id}`);
           successCount++;
         } catch (e) {
-          // 如果标签页没有加载 content script，尝试注入脚本
+          // 如果 sendMessage 失败（content script 未加载），使用 executeScript 作为备用
           try {
             await chrome.scripting.executeScript({
               target: { tabId: tab.id },
               func: () => {
                 // 通过 window.postMessage 发送消息，因为 content script 可能未加载
                 window.postMessage({ type: "refresh-words", source: "chrome-extension" }, "*");
-                console.log("[notifyBoardRefresh] 通过 postMessage 发送刷新消息");
+                console.log("[notifyBoardRefresh] 通过 postMessage 发送刷新消息（备用方案）");
               },
             });
-            console.log(`[notifyBoardRefresh] 成功通过 executeScript 通知标签页 ${tab.id}`);
+            console.log(`[notifyBoardRefresh] 成功通过 executeScript 通知标签页 ${tab.id}（备用方案）`);
             successCount++;
           } catch (err) {
             console.error(`[notifyBoardRefresh] 通知标签页 ${tab.id} 失败:`, err);
@@ -410,15 +443,15 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
     const normalizedWord = normalize(text).toLowerCase().slice(0, 200);
     
     // 检查单词是否已存在
-    const existingWord = await checkWordExists(apiKey, normalizedWord);
+    const existingWord = await checkWordExists(apiKey, normalizedWord, tabId);
     if (existingWord) {
       await sendToast(tabId, "单词已存在");
       return;
     }
 
     try {
-      // 分析单词获取信息
-      const analysis = await analyzeWord(normalizedWord);
+      // 分析单词获取信息（传入 tabId 以动态选择 API 地址）
+      const analysis = await analyzeWord(normalizedWord, tabId);
       
       // 构建单词数据
       const wordData = {
@@ -433,8 +466,8 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
         relatedWords: analysis?.relatedWords,
       };
 
-      // 保存到 API
-      await saveWordToAPI(apiKey, wordData);
+      // 保存到 API（传入 tabId 以动态选择 API 地址）
+      await saveWordToAPI(apiKey, wordData, tabId);
       await sendToast(tabId, "已保存到词汇表");
       // 通知 board 页面刷新
       await notifyBoardRefresh(tabId);
@@ -451,7 +484,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
   
   // 检查句子中的单词是否已存在
   for (const token of tokens) {
-    const existing = await checkWordExists(apiKey, token);
+    const existing = await checkWordExists(apiKey, token, tabId);
     if (existing) {
       matchedWord = existing;
       break;
@@ -476,7 +509,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
     try {
       await updateWordInAPI(apiKey, matchedWord.id, {
         sentences: updatedSentences,
-      });
+      }, tabId);
       await sendToast(tabId, `例句已添加到 ${matchedWord.word}`);
       // 通知 board 页面刷新
       await notifyBoardRefresh(tabId);
@@ -497,7 +530,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
   const pickedWord = normalize(pick).toLowerCase().slice(0, 200);
   
   // 检查选择的单词是否已存在
-  const existingPicked = await checkWordExists(apiKey, pickedWord);
+  const existingPicked = await checkWordExists(apiKey, pickedWord, tabId);
   
   if (existingPicked) {
     // 单词已存在，添加例句
@@ -511,7 +544,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
       try {
         await updateWordInAPI(apiKey, existingPicked.id, {
           sentences: updatedSentences,
-        });
+        }, tabId);
         await sendToast(tabId, `例句已添加到 ${existingPicked.word}`);
         // 通知 board 页面刷新
         await notifyBoardRefresh(tabId);
@@ -525,7 +558,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
   } else {
     // 创建新单词并添加例句
     try {
-      const analysis = await analyzeWord(pickedWord);
+      const analysis = await analyzeWord(pickedWord, tabId);
       
       const wordData = {
         word: pickedWord,
@@ -539,7 +572,7 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
         relatedWords: analysis?.relatedWords,
       };
 
-      await saveWordToAPI(apiKey, wordData);
+      await saveWordToAPI(apiKey, wordData, tabId);
       await sendToast(tabId, `已保存到词汇表，并将例句关联到 ${pickedWord}`);
       // 通知 board 页面刷新
       await notifyBoardRefresh(tabId);

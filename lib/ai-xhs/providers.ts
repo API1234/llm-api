@@ -33,10 +33,12 @@ const claude4Sonnet = xhsAnthropicProvider('claude-4-sonnet-20250514');
 export const qwen3_235b = xhsProvider.chat('qwen3-235b-a22b');
 export const deepseek_v3_0324 = xhsProvider.chat('deepseek-v3-0324');
 export const deepseek_coder = xhsProvider.chat('deepseek-coder-33b-instruct');
+// deepseek-r1 支持 reasoning，使用 wrapLanguageModel 包装
+// 注意：AI SDK 4 中 wrapLanguageModel 的类型可能不兼容，使用 any 类型避免类型错误
 export const deepseek_r1_xhs = wrapLanguageModel({
-  model: xhsProvider.chat('deepseek-r1'),
+  model: xhsProvider.chat('deepseek-r1') as any,
   middleware: extractReasoningMiddleware({ tagName: 'think' }),
-});
+}) as any;
 
 /**
  * 内部模型配置（用于 API 返回）

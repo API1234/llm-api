@@ -39,13 +39,26 @@ const showToast = (text) => {
 
 // 背景通知保存成功时展示提示
 try {
-  chrome.runtime.onMessage.addListener((msg) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg) return;
+    
+    // 处理保存成功提示
     if (msg.type === "save-selection-success") {
       showToast(msg.tip || "已保存到词汇表");
     }
+    
+    // 转发刷新消息到页面（用于 board 页面刷新）
+    if (msg.type === "refresh-words") {
+      console.log("[Content Script] 收到刷新消息，转发到页面");
+      // 通过 postMessage 转发到页面
+      window.postMessage({ type: "refresh-words", source: "chrome-extension" }, "*");
+    }
+    
+    return true; // 保持消息通道开放
   });
-} catch (e) {}
+} catch (e) {
+  console.error("[Content Script] 消息监听器错误:", e);
+}
 
 // 快捷键保存选中文本：Cmd/Ctrl + '+'（含 Shift + '='）或数字键盘加号
 // 注：浏览器的页面缩放快捷键可能仍会生效，但同时会尝试保存所选文本
