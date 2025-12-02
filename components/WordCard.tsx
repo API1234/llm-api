@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Word } from '@/types';
 import WordDetailModal from '@/components/WordDetailModal';
 
@@ -26,11 +26,21 @@ export default function WordCard({
 }: WordCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playingSentence, setPlayingSentence] = useState<string | null>(null); // 正在播放的例句
   const [showActions, setShowActions] = useState(false);
   const [newSentence, setNewSentence] = useState('');
   const [isAddingSentence, setIsAddingSentence] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // 组件卸载时停止所有播放
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const getApiKey = () => {
     if (typeof window !== 'undefined') {
@@ -240,6 +250,9 @@ export default function WordCard({
     setIsPlaying(true);
 
     if ('speechSynthesis' in window) {
+      // 停止当前所有播放
+      window.speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(word.word);
       utterance.lang = 'en-US';
       utterance.rate = 0.9;
@@ -255,6 +268,41 @@ export default function WordCard({
       window.speechSynthesis.speak(utterance);
     } else {
       setIsPlaying(false);
+      showToast('您的浏览器不支持语音播放功能', 'warning');
+    }
+  };
+
+  // 播放例句（使用浏览器 TTS）
+  const handlePlaySentence = (sentence: string) => {
+    if (!sentence || !sentence.trim()) return;
+
+    // 如果正在播放同一个例句，则停止
+    if (playingSentence === sentence) {
+      window.speechSynthesis.cancel();
+      setPlayingSentence(null);
+      return;
+    }
+
+    // 停止当前所有播放
+    window.speechSynthesis.cancel();
+    setPlayingSentence(sentence);
+
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      utterance.onend = () => setPlayingSentence(null);
+      utterance.onerror = () => {
+        setPlayingSentence(null);
+        showToast('播放失败，请重试', 'error');
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setPlayingSentence(null);
       showToast('您的浏览器不支持语音播放功能', 'warning');
     }
   };
@@ -388,9 +436,24 @@ export default function WordCard({
                 <div className="ml-6 space-y-1.5">
                   {meaning.examples.map((example, exampleIdx) => (
                     <div key={exampleIdx} className="space-y-0.5">
-                      {/* 英文例句（高亮单词） */}
-                      <div className="text-sm text-gray-700">
+                      {/* 英文例句（高亮单词）和播放按钮（inline） */}
+                      <div className="text-sm text-gray-700 leading-relaxed">
                         {highlightWordInSentence(example.sentence, word.word)}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlaySentence(example.sentence);
+                          }}
+                          className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
+                          title="播放例句"
+                          disabled={
+                            playingSentence === example.sentence && playingSentence !== null
+                          }
+                        >
+                          <span className="text-xs leading-none">
+                            {playingSentence === example.sentence ? '⏸️' : '🔊'}
+                          </span>
+                        </button>
                       </div>
                       {/* 中文翻译 */}
                       {example.translation && (
@@ -454,10 +517,10 @@ export default function WordCard({
             const hasNote = word.notes && word.notes[sentenceKey];
 
             return (
-              <div key={idx} className="text-sm text-gray-700 mb-1">
+              <div key={idx} className="text-sm text-gray-700 mb-1 leading-relaxed">
                 {hasNote && (
                   <span
-                    className="text-blue-500 mr-1 cursor-pointer"
+                    className="text-blue-500 cursor-pointer mr-1"
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenNote(word.id, sentenceKey, idx, word.notes![sentenceKey]);
@@ -468,6 +531,19 @@ export default function WordCard({
                   </span>
                 )}
                 {highlightWordInSentence(sentence, word.word)}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlaySentence(sentence);
+                  }}
+                  className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
+                  title="播放例句"
+                  disabled={playingSentence === sentence && playingSentence !== null}
+                >
+                  <span className="text-xs leading-none">
+                    {playingSentence === sentence ? '⏸️' : '🔊'}
+                  </span>
+                </button>
               </div>
             );
           })}
@@ -498,7 +574,7 @@ export default function WordCard({
                     className="flex items-start justify-between gap-2 text-sm text-gray-700 group"
                   >
                     <div
-                      className="flex-1"
+                      className="flex-1 leading-relaxed"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (hasNote) {
@@ -513,13 +589,26 @@ export default function WordCard({
                     >
                       {hasNote && <span className="text-blue-500 mr-1">📝</span>}
                       {highlightWordInSentence(sentence, word.word)}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlaySentence(sentence);
+                        }}
+                        className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
+                        title="播放例句"
+                        disabled={playingSentence === sentence && playingSentence !== null}
+                      >
+                        <span className="text-xs leading-none">
+                          {playingSentence === sentence ? '⏸️' : '🔊'}
+                        </span>
+                      </button>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteSentence(idx + 1);
                       }}
-                      className="text-red-500 hover:text-red-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-red-500 hover:text-red-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       title="删除例句"
                     >
                       ✕
