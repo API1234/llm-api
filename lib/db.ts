@@ -67,6 +67,7 @@ export async function initDatabase(): Promise<void> {
         
         -- 单词信息（自动获取）
         phonetic VARCHAR(255),
+        audio_url TEXT,
         meanings JSONB,
         root VARCHAR(255),
         related_words JSONB,
@@ -86,6 +87,25 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(account_id, word)
       );
     `;
+
+    // 如果表已存在但缺少 audio_url 字段，则添加该字段
+    try {
+      const columnExists = await sql`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'words' AND column_name = 'audio_url';
+      `;
+      
+      if (columnExists.length === 0) {
+        await sql`
+          ALTER TABLE words ADD COLUMN audio_url TEXT;
+        `;
+        console.log('Added audio_url column to existing words table');
+      }
+    } catch (error) {
+      // 如果检查失败，继续执行（可能是表不存在，会在上面创建）
+      console.warn('Could not check/add audio_url column:', error);
+    }
 
     // 创建索引
     await sql`
@@ -149,21 +169,36 @@ export async function createAccount(apiKey: string, name: string | null = null):
 
 // 将数据库记录转换为 Word 类型
 function wordRecordToWord(record: WordRecord): Word {
-  return {
-    id: record.id,
-    word: record.word,
-    originalWord: record.original_word || undefined,
-    url: record.url,
-    title: record.title,
-    createdAt: record.created_at_ms,
-    phonetic: record.phonetic || undefined,
-    meanings: record.meanings || undefined,
-    root: record.root || undefined,
-    relatedWords: record.related_words || undefined,
-    sentences: record.sentences || [],
-    notes: record.notes || undefined,
-    reviewTimes: record.review_times || []
-  };
+  // 确保 createdAt 是有效的时间戳
+  let createdAt = record.created_at_ms;
+  if (!createdAt || isNaN(Number(createdAt))) {
+    // 如果没有有效的时间戳，使用数据库创建时间或当前时间
+    if (record.db_created_at) {
+      const dbDate = typeof record.db_created_at === 'string' 
+        ? new Date(record.db_created_at) 
+        : record.db_created_at;
+      createdAt = dbDate.getTime();
+    } else {
+      createdAt = Date.now();
+    }
+  }
+
+    return {
+      id: record.id,
+      word: record.word,
+      originalWord: record.original_word || undefined,
+      url: record.url,
+      title: record.title,
+      createdAt: Number(createdAt),
+      phonetic: record.phonetic || undefined,
+      audioUrl: record.audio_url || undefined,
+      meanings: record.meanings || undefined,
+      root: record.root || undefined,
+      relatedWords: record.related_words || undefined,
+      sentences: record.sentences || [],
+      notes: record.notes || undefined,
+      reviewTimes: record.review_times || []
+    };
 }
 
 // 将 Word 类型转换为数据库记录
@@ -177,6 +212,7 @@ function wordToWordRecord(word: Word, accountId: number): Partial<WordRecord> {
     title: word.title,
     created_at_ms: word.createdAt,
     phonetic: word.phonetic || null,
+    audio_url: word.audioUrl || null,
     meanings: word.meanings || null,
     root: word.root || null,
     related_words: word.relatedWords || null,
@@ -249,7 +285,7 @@ export async function createWord(accountId: number, wordData: Word): Promise<Wor
       INSERT INTO words (
         id, account_id, word, original_word,
         url, title, created_at_ms,
-        phonetic, meanings, root, related_words,
+        phonetic, audio_url, meanings, root, related_words,
         sentences, notes, review_times
       )
       VALUES (
@@ -261,6 +297,7 @@ export async function createWord(accountId: number, wordData: Word): Promise<Wor
         ${record.title}, 
         ${record.created_at_ms},
         ${record.phonetic}, 
+        ${record.audio_url},
         ${record.meanings ? JSON.stringify(record.meanings) : null}::jsonb, 
         ${record.root}, 
         ${record.related_words ? JSON.stringify(record.related_words) : null}::jsonb,
@@ -303,6 +340,7 @@ export async function updateWordById(accountId: number, wordId: string, wordData
         url = ${record.url},
         title = ${record.title},
         phonetic = ${record.phonetic},
+        audio_url = ${record.audio_url},
         meanings = ${record.meanings ? JSON.stringify(record.meanings) : null}::jsonb,
         root = ${record.root},
         related_words = ${record.related_words ? JSON.stringify(record.related_words) : null}::jsonb,

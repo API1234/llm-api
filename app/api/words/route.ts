@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
       title: body.title,
       createdAt: Date.now(),
       phonetic: body.phonetic,
+      audioUrl: body.audioUrl,
       meanings: body.meanings,
       root: body.root,
       relatedWords: body.relatedWords,

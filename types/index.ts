@@ -26,6 +26,7 @@ export interface Word {
   
   // 单词信息（自动获取）
   phonetic?: string;             // 音标
+  audioUrl?: string;             // 音频 URL（发音）
   meanings?: Meaning[];          // 释义数组 [{partOfSpeech, definitions}]
   root?: string;                 // 词根
   relatedWords?: string[];       // 关联词列表
@@ -50,6 +51,7 @@ export interface WordRecord {
   title: string;                 // 来源网页标题
   created_at_ms: number;         // 创建时间戳（毫秒）
   phonetic: string | null;       // 音标
+  audio_url: string | null;     // 音频 URL
   meanings: Meaning[] | null;     // 释义数组（JSONB）
   root: string | null;           // 词根
   related_words: string[] | null; // 关联词列表（JSONB）
@@ -66,10 +68,18 @@ export interface AnalyzeRequest {
 }
 
 export interface AnalyzeResponse {
-  lemma?: string;
-  pos?: string;
-  family?: string[];
-  text?: string;
+  // 单词基本信息
+  phonetic?: string;           // 音标
+  audioUrl?: string;           // 音频 URL（发音）
+  meanings?: Meaning[];        // 释义数组
+  root?: string;               // 词根
+  relatedWords?: string[];     // 关联词列表
+  
+  // 兼容旧字段
+  lemma?: string;              // 词根形式（同 root）
+  pos?: string;                // 词性（从 meanings 中提取）
+  family?: string[];            // 词族（同 relatedWords）
+  text?: string;                // 文本内容
   [key: string]: any;
 }
 
