@@ -119,34 +119,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 提取词根（简单处理：使用单词本身作为词根，或尝试提取词干）
-    // 这里可以后续优化，使用更复杂的词根提取逻辑
-    const root = extractRoot(normalizedWord);
-
-    // 提取关联词（从 meanings 中提取同义词和反义词）
-    const relatedWords: string[] = [];
-    if (entry.meanings && Array.isArray(entry.meanings)) {
-      entry.meanings.forEach((meaning: any) => {
-        if (meaning.synonyms && Array.isArray(meaning.synonyms)) {
-          relatedWords.push(...meaning.synonyms.slice(0, 5));
-        }
-        if (meaning.antonyms && Array.isArray(meaning.antonyms)) {
-          // 反义词也可以作为关联词
-          relatedWords.push(...meaning.antonyms.slice(0, 3));
-        }
-      });
-    }
-    // 去重
-    const uniqueRelatedWords = Array.from(new Set(relatedWords.map(w => w.toLowerCase())))
-      .slice(0, 10);
-
-    // 构建响应
+    // 构建响应（只返回音标、音频和词性信息）
     const result: AnalyzeResponse = {
       phonetic,
       audioUrl, // 音频 URL（如果可用）
       meanings: meanings.length > 0 ? meanings : undefined,
-      root,
-      relatedWords: uniqueRelatedWords.length > 0 ? uniqueRelatedWords : undefined,
       // 保留原有字段以兼容
       lemma: normalizedWord,
       pos: meanings.length > 0 ? meanings[0].partOfSpeech : undefined,
@@ -163,28 +140,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * 简单的词根提取函数
- * 这里只是简单实现，可以后续优化
- */
-function extractRoot(word: string): string {
-  // 移除常见的后缀
-  const suffixes = [
-    'ing', 'ed', 'er', 'est', 'ly', 'tion', 'sion', 'ness', 'ment',
-    'able', 'ible', 'ful', 'less', 'ous', 'ious', 'al', 'ic', 'ive'
-  ];
-
-  for (const suffix of suffixes) {
-    if (word.endsWith(suffix) && word.length > suffix.length + 2) {
-      return word.slice(0, -suffix.length);
-    }
-  }
-
-  // 如果找不到后缀，返回单词本身（去掉可能的复数形式）
-  if (word.endsWith('s') && word.length > 3) {
-    return word.slice(0, -1);
-  }
-
-  return word;
-}
 

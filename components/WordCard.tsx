@@ -2,25 +2,47 @@
 
 import { useState } from 'react';
 import { Word } from '@/types';
-import { format } from 'date-fns';
 
 interface WordCardProps {
   word: Word;
   searchQuery: string;
-  onUpdate: () => void;
-  onNoteClick: (sentenceKey: string, sentenceIndex: number, markdown: string) => void;
+  onUpdate: (word: Word) => void;
+  onDelete: (wordId: string) => void;
+  onOpenNote: (wordId: string, sentenceKey: string, sentenceIndex: number, markdown: string) => void;
 }
 
-export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: WordCardProps) {
-  const [newSentence, setNewSentence] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpenNote }: WordCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const [newSentence, setNewSentence] = useState('');
+  const [isAddingSentence, setIsAddingSentence] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const getApiKey = () => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('api_key') || '';
     }
     return '';
+  };
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(message, type);
+    }
+  };
+
+  const showConfirm = async (options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmButtonStyle?: 'primary' | 'danger';
+  }): Promise<boolean> => {
+    if (typeof window !== 'undefined' && (window as any).showConfirm) {
+      return (window as any).showConfirm(options);
+    }
+    return false;
   };
 
   const highlightText = (text: string, query: string) => {
@@ -37,12 +59,27 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
     );
   };
 
+
+  const handleDelete = async () => {
+    const confirmed = await showConfirm({
+      title: '确认删除',
+      message: '确认删除该单词？此操作不可撤销。',
+      confirmText: '删除',
+      cancelText: '取消',
+      confirmButtonStyle: 'danger',
+    });
+    
+    if (!confirmed) return;
+    onDelete(word.id);
+  };
+
   const handleAddSentence = async () => {
     if (!newSentence.trim()) return;
 
     const apiKey = getApiKey();
     if (!apiKey) return;
 
+    setIsAddingSentence(true);
     const updatedSentences = [...(word.sentences || []), newSentence.trim()].slice(0, 20);
 
     try {
@@ -59,11 +96,18 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
       });
 
       if (response.ok) {
+        const updatedWord = await response.json();
+        onUpdate(updatedWord);
         setNewSentence('');
-        onUpdate();
+        showToast('例句添加成功', 'success');
+      } else {
+        showToast('添加例句失败，请重试', 'error');
       }
     } catch (error) {
       console.error('Error adding sentence:', error);
+      showToast('添加例句失败，请重试', 'error');
+    } finally {
+      setIsAddingSentence(false);
     }
   };
 
@@ -87,52 +131,116 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
       });
 
       if (response.ok) {
-        onUpdate();
+        const updatedWord = await response.json();
+        onUpdate(updatedWord);
+        showToast('例句删除成功', 'success');
+      } else {
+        showToast('删除例句失败，请重试', 'error');
       }
     } catch (error) {
       console.error('Error deleting sentence:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('确认删除该条目？')) return;
-
-    const apiKey = getApiKey();
-    if (!apiKey) return;
-
-    try {
-      const response = await fetch('/api/words', {
-        method: 'DELETE',
-        headers: {
-          'X-API-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: word.id }),
-      });
-
-      if (response.ok) {
-        onUpdate();
-      }
-    } catch (error) {
-      console.error('Error deleting word:', error);
-    }
-  };
-
-  const handleCopy = async () => {
-    const text = [word.word, ...(word.sentences || [])].filter(Boolean).join('\n');
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('已复制');
-    } catch (error) {
-      alert('复制失败');
+      showToast('删除例句失败，请重试', 'error');
     }
   };
 
   const handleRefresh = async () => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      showToast('请先设置 API Key', 'warning');
+      return;
+    }
+
+    const confirmed = await showConfirm({
+      title: '确认刷新',
+      message: '确认刷新该单词的信息？这将重新获取词性、词根、词族、翻译和例句。',
+      confirmText: '刷新',
+      cancelText: '取消',
+      confirmButtonStyle: 'primary',
+    });
+    
+    if (!confirmed) return;
+
     setIsRefreshing(true);
-    // TODO: 实现刷新单词信息
-    setTimeout(() => setIsRefreshing(false), 1000);
+    try {
+      const normalizedWord = word.word.toLowerCase();
+
+      // 并行调用两个接口：基础信息（音标、音频）和完整分析（词性、词根、词族、翻译、例句）
+      const [analyzeResponse, enrichmentResponse] = await Promise.allSettled([
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ word: normalizedWord }),
+        }),
+        fetch('/api/word-enrichment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ word: normalizedWord }),
+        }),
+      ]);
+
+      // 处理基础信息结果
+      let analyzeData = null;
+      if (analyzeResponse.status === 'fulfilled' && analyzeResponse.value.ok) {
+        analyzeData = await analyzeResponse.value.json();
+      } else {
+        console.warn('Failed to fetch word analysis');
+      }
+
+      // 处理完整分析结果
+      let enrichmentData = null;
+      if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
+        enrichmentData = await enrichmentResponse.value.json();
+      } else {
+        const error = enrichmentResponse.status === 'rejected'
+          ? enrichmentResponse.reason
+          : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
+        throw new Error(error.message || error.error || '获取单词分析失败');
+      }
+
+      // 更新单词数据（保留原有的例句和笔记）
+      const updatedWordData = {
+        id: word.id,
+        phonetic: analyzeData?.phonetic || word.phonetic,
+        audioUrl: analyzeData?.audioUrl || word.audioUrl,
+        meanings: enrichmentData?.meanings || word.meanings,
+        root: enrichmentData?.root || word.root,
+        rootMeaning: enrichmentData?.rootMeaning || word.rootMeaning,
+        relatedWords: enrichmentData?.wordFamily || word.relatedWords || [],
+        // 保留原有的例句和笔记
+        sentences: word.sentences || [],
+        notes: word.notes || {},
+      };
+
+      // 更新到数据库
+      const updateResponse = await fetch('/api/words', {
+        method: 'PUT',
+        headers: {
+          'X-API-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedWordData),
+      });
+
+      if (updateResponse.ok) {
+        const updatedWord = await updateResponse.json();
+        onUpdate(updatedWord);
+        showToast('单词信息已刷新', 'success');
+      } else {
+        const error = await updateResponse.json().catch(() => ({ error: '更新失败' }));
+        throw new Error(error.error || '更新单词失败');
+      }
+    } catch (error: any) {
+      console.error('Error refreshing word:', error);
+      showToast(`刷新失败: ${error.message || '未知错误'}`, 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
+
 
   const normalizeSentenceKey = (s: string) => s.trim().toLowerCase();
 
@@ -179,65 +287,102 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
       window.speechSynthesis.speak(utterance);
     } else {
       setIsPlaying(false);
-      alert('您的浏览器不支持语音播放功能');
+      showToast('您的浏览器不支持语音播放功能', 'warning');
     }
   };
 
-  const getPartOfSpeechCN = (pos: string) => {
+  const getPartOfSpeechAbbr = (pos: string) => {
     const map: Record<string, string> = {
-      noun: '名词',
-      verb: '动词',
-      adjective: '形容词',
-      adverb: '副词',
-      pronoun: '代词',
-      preposition: '介词',
-      conjunction: '连词',
-      interjection: '感叹词',
+      noun: 'n.',
+      verb: 'v.',
+      adjective: 'adj.',
+      adverb: 'adv.',
+      pronoun: 'pron.',
+      preposition: 'prep.',
+      conjunction: 'conj.',
+      interjection: 'interj.',
     };
     return map[pos.toLowerCase()] || pos;
   };
 
+  const sentenceCount = (word.sentences || []).length;
+  const hasRoot = word.root && word.root.trim().length > 0;
+  const hasWordFamily = word.relatedWords && word.relatedWords.length > 0;
+
+  // 高亮例句中的单词（参考图片样式：粉红色高亮）
+  const highlightWordInSentence = (sentence: string, wordToHighlight: string) => {
+    // 转义特殊字符
+    const escapedWord = wordToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b(${escapedWord})\\b`, 'gi');
+    const parts = sentence.split(regex);
+    return parts.map((part, i) => {
+      if (regex.test(part)) {
+        return (
+          <strong key={i} className="text-pink-600 font-semibold">
+            {part}
+          </strong>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   return (
-    <div className="card card-hover">
-      {/* 头部 */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="text-2xl font-bold text-gray-900 mb-1">
-            {highlightText(word.word, searchQuery)}
-          </div>
-          {word.phonetic && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-              <span>{word.phonetic}</span>
-              <button
-                onClick={handlePlayPronunciation}
-                disabled={isPlaying}
-                className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                title="播放发音"
-              >
-                {isPlaying ? '⏸️' : '🔊'}
-              </button>
+    <div 
+      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all duration-200"
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* 头部：单词、音标和操作按钮 */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          {/* 单词、音标和播放按钮（同一行） */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="text-2xl font-bold text-gray-900">
+              {highlightText(word.word, searchQuery)}
             </div>
-          )}
+            {word.phonetic && (
+              <>
+                <span className="text-sm text-gray-500">{word.phonetic}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayPronunciation();
+                  }}
+                  disabled={isPlaying}
+                  className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                  title="播放发音"
+                >
+                  <span className="text-sm">{isPlaying ? '⏸️' : '🔊'}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
+        
+        {/* 操作按钮（hover 时显示，使用 opacity 和 pointer-events 避免布局抖动） */}
+        <div 
+          className={`flex gap-1 ml-2 transition-opacity duration-200 ${
+            showActions ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+        >
           <button
-            onClick={handleRefresh}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefresh();
+            }}
             disabled={isRefreshing}
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 hover:bg-blue-100 rounded transition-colors text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
             title="刷新单词信息"
           >
-            {isRefreshing ? '⏳' : '↻'}
+            {isRefreshing ? '⏳' : '🔄'}
           </button>
           <button
-            onClick={handleCopy}
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            title="复制"
-          >
-            ⧉
-          </button>
-          <button
-            onClick={handleDelete}
-            className="p-2 hover:bg-red-100 rounded transition-colors text-red-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            className="p-1.5 hover:bg-red-100 rounded transition-colors text-red-600"
             title="删除"
           >
             ✕
@@ -245,33 +390,80 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
         </div>
       </div>
 
-      {/* 释义 */}
+      {/* 释义（参考图片样式：词性 + 中文翻译 + 例句） */}
       {word.meanings && word.meanings.length > 0 && (
-        <div className="mb-4">
+        <div className="mb-3 space-y-3">
           {word.meanings.map((meaning, idx) => (
-            <div key={idx} className="mb-2">
-              <span className="text-xs font-semibold text-cyan-600 bg-cyan-50 px-2 py-1 rounded">
-                {getPartOfSpeechCN(meaning.partOfSpeech)}
-              </span>
-              <ul className="mt-1 ml-4 list-disc text-sm text-gray-700">
-                {meaning.definitions.map((def, defIdx) => (
-                  <li key={defIdx}>{def}</li>
-                ))}
-              </ul>
+            <div key={idx} className="space-y-2">
+              {/* 词性和中文翻译 */}
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">
+                  {getPartOfSpeechAbbr(meaning.partOfSpeech)}
+                </span>
+                <span className="text-sm text-gray-900 flex-1">
+                  {meaning.translation || meaning.definitions[0]}
+                </span>
+              </div>
+              
+              {/* 例句（如果有） */}
+              {meaning.examples && meaning.examples.length > 0 && (
+                <div className="ml-6 space-y-1.5">
+                  {meaning.examples.map((example, exampleIdx) => (
+                    <div key={exampleIdx} className="space-y-0.5">
+                      {/* 英文例句（高亮单词） */}
+                      <div className="text-sm text-gray-700">
+                        {highlightWordInSentence(example.sentence, word.word)}
+                      </div>
+                      {/* 中文翻译 */}
+                      {example.translation && (
+                        <div className="text-xs text-gray-500 ml-0">
+                          {example.translation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* 关联词 */}
-      {word.relatedWords && word.relatedWords.length > 0 && (
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-2">关联词：</div>
-          <div className="flex flex-wrap gap-2">
-            {word.relatedWords.map((relatedWord, idx) => (
+      {/* 词根和词族（如果有，显示在核心位置） */}
+      {hasRoot && (
+        <div className="mb-3 p-2 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
+          <div className="text-xs font-semibold text-purple-700 mb-1">词根</div>
+          <div className="text-sm font-medium text-gray-800">{word.root}</div>
+          {word.rootMeaning && (
+            <div className="text-xs text-gray-600 mt-0.5">{word.rootMeaning}</div>
+          )}
+          {hasWordFamily && (
+            <div className="mt-2 pt-2 border-t border-purple-200">
+              <div className="text-xs font-semibold text-purple-700 mb-1">词族</div>
+              <div className="flex flex-wrap gap-1.5">
+                {word.relatedWords?.map((relatedWord, idx) => (
+                  <span
+                    key={idx}
+                    className="text-xs px-1.5 py-0.5 bg-white rounded border border-purple-200 text-gray-700"
+                  >
+                    {relatedWord}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 关联词（如果没有词根，显示关联词） */}
+      {!hasRoot && hasWordFamily && (
+        <div className="mb-3">
+          <div className="text-xs font-medium text-gray-600 mb-1.5">关联词</div>
+          <div className="flex flex-wrap gap-1.5">
+            {(word.relatedWords || []).map((relatedWord, idx) => (
               <span
                 key={idx}
-                className="text-sm px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 cursor-pointer transition-colors"
+                className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-700"
               >
                 {relatedWord}
               </span>
@@ -280,90 +472,120 @@ export default function WordCard({ word, searchQuery, onUpdate, onNoteClick }: W
         </div>
       )}
 
-      {/* 例句 */}
-      <div className="mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">例句：</div>
-        <div className="space-y-2">
-          {(word.sentences || []).map((sentence, idx) => {
+      {/* 例句（参考图片样式：高亮单词，简洁显示） */}
+      {sentenceCount > 0 && (
+        <div className="mb-3">
+          {/* 显示第一个例句（始终显示） */}
+          {(word.sentences || []).slice(0, 1).map((sentence, idx) => {
             const sentenceKey = normalizeSentenceKey(sentence);
             const hasNote = word.notes && word.notes[sentenceKey];
+            
             return (
-              <div
-                key={idx}
-                className="flex items-start justify-between gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
-              >
-                <div
-                  className={`flex-1 text-sm ${
-                    hasNote ? 'text-cyan-700 font-medium cursor-pointer' : 'text-gray-700'
-                  }`}
-                  onClick={() => {
-                    if (hasNote) {
-                      onNoteClick(sentenceKey, idx, word.notes![sentenceKey]);
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    onNoteClick(sentenceKey, idx, word.notes?.[sentenceKey] || '');
-                  }}
-                >
-                  {sentence}
-                </div>
-                <button
-                  onClick={() => handleDeleteSentence(idx)}
-                  className="text-red-500 hover:text-red-700 text-xs"
-                >
-                  ✕
-                </button>
+              <div key={idx} className="text-sm text-gray-700 mb-1">
+                {hasNote && (
+                  <span 
+                    className="text-blue-500 mr-1 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenNote(word.id, sentenceKey, idx, word.notes![sentenceKey]);
+                    }}
+                    title="查看笔记"
+                  >
+                    📝
+                  </span>
+                )}
+                {highlightWordInSentence(sentence, word.word)}
               </div>
             );
           })}
+          
+          {/* 展开查看更多例句 */}
+          {sentenceCount > 1 && (
+            <div 
+              className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 mb-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              {isExpanded ? '收起' : `查看全部 ${sentenceCount} 个例句`}
+            </div>
+          )}
+          
+          {/* 展开的例句列表 */}
+          {isExpanded && sentenceCount > 1 && (
+            <div className="mt-2 space-y-2">
+              {(word.sentences || []).slice(1).map((sentence, idx) => {
+                const sentenceKey = normalizeSentenceKey(sentence);
+                const hasNote = word.notes && word.notes[sentenceKey];
+                
+                return (
+                  <div
+                    key={idx + 1}
+                    className="flex items-start justify-between gap-2 text-sm text-gray-700 group"
+                  >
+                    <div
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasNote) {
+                          onOpenNote(word.id, sentenceKey, idx + 1, word.notes![sentenceKey]);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenNote(word.id, sentenceKey, idx + 1, word.notes?.[sentenceKey] || '');
+                      }}
+                    >
+                      {hasNote && <span className="text-blue-500 mr-1">📝</span>}
+                      {highlightWordInSentence(sentence, word.word)}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSentence(idx + 1);
+                      }}
+                      className="text-red-500 hover:text-red-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="删除例句"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div className="mt-2">
+      )}
+      
+      {/* 添加例句输入框（始终显示在底部） */}
+      <div className="mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-1.5">
           <input
             type="text"
             value={newSentence}
             onChange={(e) => setNewSentence(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !isAddingSentence && newSentence.trim()) {
+                e.stopPropagation();
                 handleAddSentence();
               }
             }}
-            placeholder="为该单词新增例句，回车保存"
-            className="input w-full text-sm"
+            placeholder="添加例句..."
+            className="flex-1 text-sm px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isAddingSentence}
           />
-        </div>
-      </div>
-
-      {/* 来源信息 */}
-      {(word.title || word.url) && (
-        <div className="mb-4 text-sm text-gray-600">
-          {word.title && <div className="font-medium mb-1">{word.title}</div>}
-          {word.url && (
-            <a
-              href={word.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-cyan-600 hover:underline"
-            >
-              {new URL(word.url).hostname}
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* 元数据 */}
-      <div className="text-xs text-gray-500 space-y-1 border-t pt-3">
-        <div className="flex justify-between">
-          <span>添加时间</span>
-          <span>
-            {word.createdAt && !isNaN(word.createdAt)
-              ? format(new Date(word.createdAt), 'yyyy-MM-dd HH:mm:ss')
-              : '未知'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>复习次数</span>
-          <span>{(word.reviewTimes || []).length} 次</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddSentence();
+            }}
+            disabled={isAddingSentence || !newSentence.trim()}
+            className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            {isAddingSentence ? '...' : '添加'}
+          </button>
         </div>
       </div>
     </div>

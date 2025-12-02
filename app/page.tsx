@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 
+const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+  if (typeof window !== 'undefined' && (window as any).showToast) {
+    (window as any).showToast(message, type);
+  }
+};
+
 export default function Home() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
@@ -12,7 +18,7 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<{
     basicInfo: any;
-    wordAnalysis: any;
+    enrichment?: any;
   } | null>(null);
 
   // 内部模型列表
@@ -75,7 +81,7 @@ export default function Home() {
 
   const handleAnalyzeWord = async () => {
     if (!wordInput.trim()) {
-      alert('请输入单词');
+      showToast('请输入单词', 'warning');
       return;
     }
 
@@ -83,28 +89,27 @@ export default function Home() {
     setAnalyzeResult(null);
 
     try {
-      // 并行调用两个接口
-      const [basicInfoResponse, wordAnalysisResponse] = await Promise.allSettled([
+      const normalizedWord = wordInput.trim().toLowerCase();
+
+      // 并行调用两个接口：基础信息（音标、音频）和完整分析（词性、词根、词族、翻译、例句）
+      const [basicInfoResponse, enrichmentResponse] = await Promise.allSettled([
         fetch('/api/analyze', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ word: wordInput.trim() }),
+          body: JSON.stringify({ word: normalizedWord }),
         }),
-        fetch('/api/word-analysis', {
+        fetch('/api/word-enrichment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ word: wordInput.trim() }),
+          body: JSON.stringify({ word: normalizedWord }),
         }),
       ]);
 
       let basicInfo = null;
-      let wordAnalysis = null;
-
-      // 处理基础信息结果
       if (basicInfoResponse.status === 'fulfilled' && basicInfoResponse.value.ok) {
         basicInfo = await basicInfoResponse.value.json();
       } else {
@@ -114,24 +119,24 @@ export default function Home() {
         basicInfo = { error: error.message || error.error || '获取基础信息失败' };
       }
 
-      // 处理词根词族分析结果
-      if (wordAnalysisResponse.status === 'fulfilled' && wordAnalysisResponse.value.ok) {
-        wordAnalysis = await wordAnalysisResponse.value.json();
+      let enrichment = null;
+      if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
+        enrichment = await enrichmentResponse.value.json();
       } else {
-        const error = wordAnalysisResponse.status === 'rejected'
-          ? wordAnalysisResponse.reason
-          : await wordAnalysisResponse.value.json().catch(() => ({ error: '请求失败' }));
-        wordAnalysis = { error: error.message || error.error || '获取词根词族分析失败' };
+        const error = enrichmentResponse.status === 'rejected'
+          ? enrichmentResponse.reason
+          : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
+        enrichment = { error: error.message || error.error || '获取词根、词族、翻译和例句失败' };
       }
 
       setAnalyzeResult({
         basicInfo,
-        wordAnalysis,
+        enrichment,
       });
     } catch (error: any) {
       setAnalyzeResult({
         basicInfo: { error: '请求异常', details: error.message },
-        wordAnalysis: { error: '请求异常', details: error.message },
+        enrichment: { error: '请求异常', details: error.message },
       });
     } finally {
       setAnalyzing(false);
@@ -244,29 +249,31 @@ export default function Home() {
               </pre>
             </div>
 
-            {/* 词根词族分析 */}
-            <div style={{ 
-              padding: '1rem', 
-              borderRadius: '4px',
-              backgroundColor: 'white',
-              border: '1px solid #ddd',
-            }}>
-              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#333' }}>
-                2. 词根词族分析 (来自 /api/word-analysis)
-              </h4>
-              <pre style={{
-                margin: 0,
-                padding: '0.75rem',
-                backgroundColor: '#f5f5f5',
+            {/* 词根、词族、翻译和例句（合并接口） */}
+            {analyzeResult.enrichment && (
+              <div style={{ 
+                padding: '1rem', 
                 borderRadius: '4px',
-                overflow: 'auto',
-                fontSize: '0.85rem',
-                lineHeight: '1.5',
-                maxHeight: '400px',
+                backgroundColor: 'white',
+                border: '1px solid #ddd',
               }}>
-                {JSON.stringify(analyzeResult.wordAnalysis, null, 2)}
-              </pre>
-            </div>
+                <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#333' }}>
+                  2. 词根、词族、翻译和例句 (来自 /api/word-enrichment)
+                </h4>
+                <pre style={{
+                  margin: 0,
+                  padding: '0.75rem',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '4px',
+                  overflow: 'auto',
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5',
+                  maxHeight: '400px',
+                }}>
+                  {JSON.stringify(analyzeResult.enrichment, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </div>

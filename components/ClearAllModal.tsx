@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Modal from '@/components/ui/Modal';
 
 interface ClearAllModalProps {
   show: boolean;
@@ -17,49 +18,42 @@ export default function ClearAllModal({ show, onClose, onConfirm }: ClearAllModa
     }
     onConfirm();
     setConfirmText('');
+    onClose();
   };
 
-  if (!show) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">清空全部</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="mb-4">
+    <Modal show={show} onClose={onClose} title="清空全部" size="md">
+      <div className="space-y-4">
+        <div>
           <input
             type="text"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="请输入 清空 以确认"
-            className="input w-full"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
             autoFocus
           />
           <p className="text-sm text-gray-600 mt-2">
             为防误操作，请输入"清空"两个字后再确认。
           </p>
         </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="btn btn-secondary">
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+          >
             取消
           </button>
           <button
             onClick={handleConfirm}
             disabled={confirmText !== '清空'}
-            className="btn btn-danger"
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             确认清空
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

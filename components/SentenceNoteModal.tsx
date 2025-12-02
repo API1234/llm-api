@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import Modal from '@/components/ui/Modal';
 
 interface SentenceNoteModalProps {
   show: boolean;
@@ -25,6 +26,25 @@ export default function SentenceNoteModal({
   const [markdown, setMarkdown] = useState(initialMarkdown);
   const [mode, setMode] = useState<'edit' | 'view'>(initialMarkdown ? 'view' : 'edit');
   const [loading, setLoading] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(message, type);
+    }
+  };
+
+  const showConfirm = async (options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmButtonStyle?: 'primary' | 'danger';
+  }): Promise<boolean> => {
+    if (typeof window !== 'undefined' && (window as any).showConfirm) {
+      return (window as any).showConfirm(options);
+    }
+    return false;
+  };
 
   const getApiKey = () => {
     if (typeof window !== 'undefined') {
@@ -74,19 +94,28 @@ export default function SentenceNoteModal({
       });
 
       if (updateResponse.ok) {
+        showToast('保存成功', 'success');
         onSave();
         onClose();
       }
     } catch (error) {
       console.error('Error saving note:', error);
-      alert('保存失败');
+      showToast('保存失败', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('确认删除解析？')) return;
+    const confirmed = await showConfirm({
+      title: '确认删除',
+      message: '确认删除该例句的解析？',
+      confirmText: '删除',
+      cancelText: '取消',
+      confirmButtonStyle: 'danger',
+    });
+    
+    if (!confirmed) return;
 
     const apiKey = getApiKey();
     if (!apiKey) return;
@@ -121,73 +150,79 @@ export default function SentenceNoteModal({
       });
 
       if (updateResponse.ok) {
+        showToast('删除成功', 'success');
         onSave();
         onClose();
       }
     } catch (error) {
       console.error('Error deleting note:', error);
-      alert('删除失败');
+      showToast('删除失败', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!show) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">例句详细解析（Markdown）</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="mb-4">
-          {mode === 'view' ? (
-            <div className="prose max-w-none">
-              <ReactMarkdown>{markdown || '暂无解析'}</ReactMarkdown>
-            </div>
-          ) : (
-            <textarea
-              value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              placeholder="使用 Markdown 编写解析...（如：单词高亮、语法点、替换、近义词等）"
-              className="input w-full h-64 font-mono text-sm"
-            />
-          )}
-        </div>
-        <div className="flex justify-end gap-3">
+    <Modal show={show} onClose={onClose} title="例句详细解析（Markdown）" size="xl">
+      <div className="space-y-4">
+        {mode === 'view' ? (
+          <div className="prose max-w-none min-h-[200px] p-4 bg-gray-50 rounded-lg">
+            <ReactMarkdown>{markdown || '暂无解析'}</ReactMarkdown>
+          </div>
+        ) : (
+          <textarea
+            value={markdown}
+            onChange={(e) => setMarkdown(e.target.value)}
+            placeholder="使用 Markdown 编写解析...（如：单词高亮、语法点、替换、近义词等）"
+            className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+          />
+        )}
+        <div className="flex justify-end gap-3 pt-2">
           {mode === 'view' ? (
             <>
-              <button onClick={() => setMode('edit')} className="btn btn-secondary">
+              <button
+                onClick={() => setMode('edit')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
                 编辑
               </button>
               {markdown && (
-                <button onClick={handleDelete} className="btn btn-danger" disabled={loading}>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
                   删除解析
                 </button>
               )}
             </>
           ) : (
             <>
-              <button onClick={() => setMode('view')} className="btn btn-secondary">
+              <button
+                onClick={() => setMode('view')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
                 预览
               </button>
-              <button onClick={onClose} className="btn btn-secondary" disabled={loading}>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+                disabled={loading}
+              >
                 取消
               </button>
-              <button onClick={handleSave} className="btn btn-primary" disabled={loading}>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading}
+              >
                 保存
               </button>
             </>
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

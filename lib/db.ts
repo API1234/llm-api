@@ -70,6 +70,7 @@ export async function initDatabase(): Promise<void> {
         audio_url TEXT,
         meanings JSONB,
         root VARCHAR(255),
+        root_meaning TEXT,
         related_words JSONB,
         
         -- 学习内容
@@ -105,6 +106,25 @@ export async function initDatabase(): Promise<void> {
     } catch (error) {
       // 如果检查失败，继续执行（可能是表不存在，会在上面创建）
       console.warn('Could not check/add audio_url column:', error);
+    }
+
+    // 如果表已存在但缺少 root_meaning 字段，则添加该字段
+    try {
+      const columnExists = await sql`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'words' AND column_name = 'root_meaning';
+      `;
+      
+      if (columnExists.length === 0) {
+        await sql`
+          ALTER TABLE words ADD COLUMN root_meaning TEXT;
+        `;
+        console.log('Added root_meaning column to existing words table');
+      }
+    } catch (error) {
+      // 如果检查失败，继续执行
+      console.warn('Could not check/add root_meaning column:', error);
     }
 
     // 创建索引
@@ -194,6 +214,7 @@ function wordRecordToWord(record: WordRecord): Word {
       audioUrl: record.audio_url || undefined,
       meanings: record.meanings || undefined,
       root: record.root || undefined,
+      rootMeaning: record.root_meaning || undefined,
       relatedWords: record.related_words || undefined,
       sentences: record.sentences || [],
       notes: record.notes || undefined,
@@ -215,6 +236,7 @@ function wordToWordRecord(word: Word, accountId: number): Partial<WordRecord> {
     audio_url: word.audioUrl || null,
     meanings: word.meanings || null,
     root: word.root || null,
+    root_meaning: word.rootMeaning || null,
     related_words: word.relatedWords || null,
     sentences: word.sentences || [],
     notes: word.notes || null,
@@ -280,12 +302,32 @@ export async function getWordByAccountIdAndWord(accountId: number, word: string)
 export async function createWord(accountId: number, wordData: Word): Promise<Word> {
   const sql = getSql();
   try {
+    // 确保 root_meaning 字段存在（如果不存在则添加）
+    try {
+      const columnExists = await sql`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'words' AND column_name = 'root_meaning';
+      `;
+      
+      if (columnExists.length === 0) {
+        console.log('Adding root_meaning column to words table...');
+        await sql`
+          ALTER TABLE words ADD COLUMN root_meaning TEXT;
+        `;
+        console.log('Successfully added root_meaning column');
+      }
+    } catch (migrationError) {
+      // 如果迁移失败，继续执行（可能是权限问题，但字段可能已存在）
+      console.warn('Could not check/add root_meaning column:', migrationError);
+    }
+
     const record = wordToWordRecord(wordData, accountId);
     const result = await sql`
       INSERT INTO words (
         id, account_id, word, original_word,
         url, title, created_at_ms,
-        phonetic, audio_url, meanings, root, related_words,
+        phonetic, audio_url, meanings, root, root_meaning, related_words,
         sentences, notes, review_times
       )
       VALUES (
@@ -300,6 +342,7 @@ export async function createWord(accountId: number, wordData: Word): Promise<Wor
         ${record.audio_url},
         ${record.meanings ? JSON.stringify(record.meanings) : null}::jsonb, 
         ${record.root}, 
+        ${record.root_meaning},
         ${record.related_words ? JSON.stringify(record.related_words) : null}::jsonb,
         ${JSON.stringify(record.sentences)}::jsonb, 
         ${record.notes ? JSON.stringify(record.notes) : null}::jsonb, 
@@ -343,6 +386,7 @@ export async function updateWordById(accountId: number, wordId: string, wordData
         audio_url = ${record.audio_url},
         meanings = ${record.meanings ? JSON.stringify(record.meanings) : null}::jsonb,
         root = ${record.root},
+        root_meaning = ${record.root_meaning},
         related_words = ${record.related_words ? JSON.stringify(record.related_words) : null}::jsonb,
         sentences = ${JSON.stringify(record.sentences)}::jsonb,
         notes = ${record.notes ? JSON.stringify(record.notes) : null}::jsonb,

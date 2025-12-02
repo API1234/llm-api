@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import ToastContainer from '@/components/ui/Toast'
+import ConfirmDialogContainer from '@/components/ui/ConfirmDialog'
 
 export const metadata: Metadata = {
   title: 'Word Analyzer API',
@@ -13,7 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ToastContainer />
+        <ConfirmDialogContainer />
+      </body>
     </html>
   )
 }

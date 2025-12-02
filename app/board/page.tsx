@@ -9,6 +9,12 @@ import SentenceNoteModal from '@/components/SentenceNoteModal';
 import ReviewPanel from '@/components/ReviewPanel';
 import { format } from 'date-fns';
 
+const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+  if (typeof window !== 'undefined' && (window as any).showToast) {
+    (window as any).showToast(message, type);
+  }
+};
+
 type Tab = 'all' | 'vocab' | 'review' | 'history';
 type SortOption = 'time_desc' | 'time_asc' | 'alpha_asc' | 'alpha_desc';
 
@@ -246,6 +252,41 @@ export default function BoardPage() {
     setShowClearModal(false);
   };
 
+  // 更新单词
+  const handleUpdateWord = (updatedWord: Word) => {
+    setWords((prevWords) =>
+      prevWords.map((word) => (word.id === updatedWord.id ? updatedWord : word))
+    );
+  };
+
+  // 删除单词
+  const handleDeleteWord = async (wordId: string) => {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
+    try {
+      const response = await fetch('/api/words', {
+        method: 'DELETE',
+        headers: {
+          'X-API-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: wordId }),
+      });
+
+      if (response.ok) {
+        setWords((prevWords) => prevWords.filter((word) => word.id !== wordId));
+        showToast('删除成功', 'success');
+      } else {
+        console.error('Failed to delete word');
+        showToast('删除失败，请重试', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting word:', error);
+      showToast('删除失败，请重试', 'error');
+    }
+  };
+
   const todayReviewWords = getTodayReviewWords();
   const historyReviewWords = getHistoryReviewWords();
 
@@ -432,11 +473,12 @@ export default function BoardPage() {
                     key={word.id}
                     word={word}
                     searchQuery={searchQuery}
-                    onUpdate={fetchWords}
-                    onNoteClick={(sentenceKey, sentenceIndex, markdown) => {
+                    onUpdate={handleUpdateWord}
+                    onDelete={handleDeleteWord}
+                    onOpenNote={(wordId, sentenceKey, sentenceIndex, markdown) => {
                       setNoteModal({
                         show: true,
-                        wordId: word.id,
+                        wordId,
                         sentenceKey,
                         sentenceIndex,
                         markdown,

@@ -6,10 +6,18 @@ export interface Account {
   created_at: Date | string;
 }
 
+// 例句类型
+export interface Example {
+  sentence: string;      // 英文例句
+  translation: string;   // 中文翻译
+}
+
 // 单词释义类型
 export interface Meaning {
   partOfSpeech: string;  // 词性，如 "noun", "verb", "adjective"
-  definitions: string[]; // 释义数组
+  definitions: string[]; // 释义数组（英文定义）
+  translation?: string;   // 中文翻译（多个翻译用分号分隔，如 "普遍的; 常见的"）
+  examples?: Example[];  // 例句数组（每个例句包含英文和中文翻译）
 }
 
 // 单词数据模型
@@ -29,6 +37,7 @@ export interface Word {
   audioUrl?: string;             // 音频 URL（发音）
   meanings?: Meaning[];          // 释义数组 [{partOfSpeech, definitions}]
   root?: string;                 // 词根
+  rootMeaning?: string;          // 词根含义
   relatedWords?: string[];       // 关联词列表
   
   // 学习内容
@@ -54,6 +63,7 @@ export interface WordRecord {
   audio_url: string | null;     // 音频 URL
   meanings: Meaning[] | null;     // 释义数组（JSONB）
   root: string | null;           // 词根
+  root_meaning: string | null;   // 词根含义
   related_words: string[] | null; // 关联词列表（JSONB）
   sentences: string[];            // 例句数组（JSONB）
   notes: Record<string, string> | null; // 例句解析（JSONB）

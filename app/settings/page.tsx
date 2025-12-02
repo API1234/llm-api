@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+  if (typeof window !== 'undefined' && (window as any).showToast) {
+    (window as any).showToast(message, type);
+  }
+};
+
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
@@ -42,9 +48,10 @@ export default function SettingsPage() {
 
       const data = await response.json();
       setApiKey(data.account.api_key);
+      showToast('账号创建成功', 'success');
     } catch (error) {
       console.error('Error creating account:', error);
-      alert('创建账号失败，请稍后重试');
+      showToast('创建账号失败，请稍后重试', 'error');
     }
   };
 

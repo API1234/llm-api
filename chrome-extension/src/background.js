@@ -197,15 +197,15 @@ const getApiBaseUrl = async (tabId) => {
   return API_BASE_URL;
 };
 
-// 调用 API 分析单词（获取基础信息和词根词族）
+// 调用 API 分析单词（获取基础信息和完整分析）
 const analyzeWord = async (word, tabId = null) => {
   try {
     // 根据当前标签页动态获取 API Base URL
     const apiBaseUrl = await getApiBaseUrl(tabId);
     
-    // 并行调用两个接口
-    const [analyzeResponse, wordAnalysisResponse] = await Promise.allSettled([
-      // 获取基础信息（音标、释义等）
+    // 并行调用两个接口：基础信息（音标、音频）和完整分析（词性、词根、词族、翻译、例句）
+    const [analyzeResponse, enrichmentResponse] = await Promise.allSettled([
+      // 获取基础信息（音标、音频）
       fetch(`${apiBaseUrl}/api/analyze`, {
         method: "POST",
         headers: {
@@ -213,8 +213,8 @@ const analyzeWord = async (word, tabId = null) => {
         },
         body: JSON.stringify({ word }),
       }),
-      // 获取词根和词族
-      fetch(`${apiBaseUrl}/api/word-analysis`, {
+      // 获取完整分析（词性、词根、词族、翻译、例句）
+      fetch(`${apiBaseUrl}/api/word-enrichment`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -228,42 +228,29 @@ const analyzeWord = async (word, tabId = null) => {
     if (analyzeResponse.status === 'fulfilled' && analyzeResponse.value.ok) {
       analyzeData = await analyzeResponse.value.json();
     } else {
-      console.warn("Failed to fetch word analysis from /api/analyze:", 
-        analyzeResponse.status === 'rejected' ? analyzeResponse.reason : 'Request failed');
+      console.warn("Failed to fetch word analysis from /api/analyze");
     }
 
-    // 处理词根和词族结果
-    let wordAnalysisData = null;
-    if (wordAnalysisResponse.status === 'fulfilled' && wordAnalysisResponse.value.ok) {
-      wordAnalysisData = await wordAnalysisResponse.value.json();
+    // 处理完整分析结果
+    let enrichmentData = null;
+    if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
+      enrichmentData = await enrichmentResponse.value.json();
+      console.log("[analyzeWord] 成功获取词性、词根、词族、翻译和例句");
     } else {
-      console.warn("Failed to fetch word analysis from /api/word-analysis:", 
-        wordAnalysisResponse.status === 'rejected' ? wordAnalysisResponse.reason : 'Request failed');
+      console.warn("Failed to fetch word enrichment");
     }
 
-    // 合并两个接口的结果
-    // 合并 relatedWords：来自 analyze 的 relatedWords + 来自 word-analysis 的 wordFamily
-    const relatedWordsFromAnalyze = analyzeData?.relatedWords || [];
-    const wordFamilyFromAnalysis = wordAnalysisData?.wordFamily || [];
-    const mergedRelatedWords = [
-      ...relatedWordsFromAnalyze,
-      ...wordFamilyFromAnalysis.filter(w => w && w.toLowerCase() !== word.toLowerCase())
-    ]
-      .map(w => w.toLowerCase()) // 统一转小写
-      .filter((v, i, a) => a.indexOf(v) === i) // 去重
-      .slice(0, 20); // 限制最多20个
-
+    // 合并结果
     const mergedResult = {
       // 基础信息（来自 /api/analyze）
       phonetic: analyzeData?.phonetic,
       audioUrl: analyzeData?.audioUrl,
-      meanings: analyzeData?.meanings,
-      // 词根和词族（来自 /api/word-analysis）
-      root: wordAnalysisData?.root,
-      rootMeaning: wordAnalysisData?.rootMeaning,
-      explanation: wordAnalysisData?.explanation,
-      // 合并后的关联词列表
-      relatedWords: mergedRelatedWords.length > 0 ? mergedRelatedWords : undefined,
+      // 完整分析（来自 /api/word-enrichment）
+      meanings: enrichmentData?.meanings,
+      root: enrichmentData?.root,
+      rootMeaning: enrichmentData?.rootMeaning,
+      explanation: enrichmentData?.explanation,
+      relatedWords: enrichmentData?.wordFamily || [],
     };
 
     return mergedResult;
@@ -361,6 +348,21 @@ const checkWordExists = async (apiKey, word, tabId = null) => {
 };
 
 // 通知 board 页面刷新单词列表
+// 检查 URL 是否可以被脚本注入访问
+const isAccessibleUrl = (url) => {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  // 这些协议/前缀的页面无法通过脚本注入访问
+  const forbiddenProtocols = [
+    'chrome://',
+    'chrome-extension://',
+    'edge://',
+    'about:',
+    'moz-extension://',
+  ];
+  return !forbiddenProtocols.some(protocol => lowerUrl.startsWith(protocol));
+};
+
 const notifyBoardRefresh = async (sourceTabId) => {
   try {
     console.log("[notifyBoardRefresh] 开始通知 board 页面刷新");
@@ -393,14 +395,23 @@ const notifyBoardRefresh = async (sourceTabId) => {
     // 只使用 sendMessage，content script 会转发到页面，避免重复发送
     let successCount = 0;
     for (const tab of boardTabs) {
-      if (tab.id) {
-        try {
-          // 只使用 sendMessage，content script 会接收并转发到页面
-          await chrome.tabs.sendMessage(tab.id, { type: "refresh-words" });
-          console.log(`[notifyBoardRefresh] 成功通过 sendMessage 通知标签页 ${tab.id}`);
-          successCount++;
-        } catch (e) {
-          // 如果 sendMessage 失败（content script 未加载），使用 executeScript 作为备用
+      if (!tab.id || !tab.url) continue;
+      
+      // 检查 URL 是否可访问
+      if (!isAccessibleUrl(tab.url)) {
+        console.warn(`[notifyBoardRefresh] 跳过无法访问的标签页 ${tab.id}: ${tab.url}`);
+        continue;
+      }
+      
+      try {
+        // 只使用 sendMessage，content script 会接收并转发到页面
+        await chrome.tabs.sendMessage(tab.id, { type: "refresh-words" });
+        console.log(`[notifyBoardRefresh] 成功通过 sendMessage 通知标签页 ${tab.id}`);
+        successCount++;
+      } catch (e) {
+        // 如果 sendMessage 失败（content script 未加载），使用 executeScript 作为备用
+        // 但只在 URL 可访问的情况下尝试
+        if (isAccessibleUrl(tab.url)) {
           try {
             await chrome.scripting.executeScript({
               target: { tabId: tab.id },
@@ -413,8 +424,13 @@ const notifyBoardRefresh = async (sourceTabId) => {
             console.log(`[notifyBoardRefresh] 成功通过 executeScript 通知标签页 ${tab.id}（备用方案）`);
             successCount++;
           } catch (err) {
-            console.error(`[notifyBoardRefresh] 通知标签页 ${tab.id} 失败:`, err);
+            // 静默处理错误，避免在控制台显示过多错误信息
+            if (err.message && !err.message.includes("Cannot access contents")) {
+              console.warn(`[notifyBoardRefresh] 通知标签页 ${tab.id} 失败:`, err.message);
+            }
           }
+        } else {
+          console.warn(`[notifyBoardRefresh] 跳过无法访问的标签页 ${tab.id}: ${tab.url}`);
         }
       }
     }
@@ -456,13 +472,15 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
       // 构建单词数据
       const wordData = {
         word: normalizedWord,
+        originalWord: selectedTextRaw, // 保存原始选中文本
         url: url || "",
         title: title || "",
         sentences: [],
         phonetic: analysis?.phonetic,
         audioUrl: analysis?.audioUrl,
-        meanings: analysis?.meanings,
+        meanings: analysis?.meanings, // 已包含翻译和例句
         root: analysis?.root,
+        rootMeaning: analysis?.rootMeaning,
         relatedWords: analysis?.relatedWords,
       };
 
@@ -567,8 +585,9 @@ const handleSaveSelection = async (tabId, url, title, selectedTextRaw) => {
         sentences: [text.slice(0, 500)],
         phonetic: analysis?.phonetic,
         audioUrl: analysis?.audioUrl,
-        meanings: analysis?.meanings,
+        meanings: analysis?.meanings, // 已包含翻译和例句
         root: analysis?.root,
+        rootMeaning: analysis?.rootMeaning,
         relatedWords: analysis?.relatedWords,
       };
 
