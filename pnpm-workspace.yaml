@@ -1,0 +1,6 @@
+# pnpm workspace 配置
+# 如果将来需要 monorepo 结构，可以在这里配置
+
+packages:
+  - '.'
+

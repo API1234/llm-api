@@ -6,8 +6,9 @@
 
 - **框架**: Next.js 14 (App Router)
 - **语言**: TypeScript
-- **数据库**: PostgreSQL (@vercel/postgres)
-- **AI**: OpenAI
+- **包管理**: pnpm
+- **数据库**: PostgreSQL (@neondatabase/serverless)
+- **AI**: OpenAI (可选，已改用 Free Dictionary API)
 - **部署**: Vercel
 
 ## 功能特性
@@ -19,10 +20,22 @@
 
 ## 🚀 本地开发
 
+### 前置要求
+
+- Node.js 18+ 
+- pnpm 8+ (推荐使用 pnpm 管理依赖)
+
+安装 pnpm（如果还没有安装）：
+```bash
+npm install -g pnpm
+# 或
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
+
 ### 1. 安装依赖
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 2. 配置环境变量
@@ -69,7 +82,7 @@ INIT_DB_SECRET=dev-secret
 ### 3. 初始化数据库
 
 ```bash
-npm run init-db
+pnpm run init-db
 ```
 
 或直接运行脚本：
@@ -81,7 +94,7 @@ node scripts/init-db.js
 ### 4. 启动开发服务器
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 服务器将在 `http://localhost:3000` 启动。
@@ -91,7 +104,8 @@ npm run dev
 运行测试脚本（需要先启动开发服务器）：
 
 ```bash
-npm run test-api
+# 使用 curl 或其他工具测试 API
+# 查看 API_EXAMPLES.md 获取详细示例
 ```
 
 ### 6. API 调用示例

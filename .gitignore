@@ -3,6 +3,10 @@ node_modules
 /.pnp
 .pnp.js
 
+# pnpm
+.pnpm-store
+# 注意: pnpm-lock.yaml 应该提交到版本控制
+
 # Testing
 /coverage
 

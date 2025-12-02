@@ -105,6 +105,7 @@ export interface WordRequest {
   url: string;                    // 必需：来源网页 URL
   title: string;                  // 必需：来源网页标题
   phonetic?: string;              // 可选：音标
+  audioUrl?: string;              // 可选：音频 URL
   meanings?: Meaning[];           // 可选：释义数组
   root?: string;                  // 可选：词根
   relatedWords?: string[];        // 可选：关联词列表
