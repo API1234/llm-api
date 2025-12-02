@@ -15,6 +15,16 @@ export default function Home() {
         <li><strong>POST</strong> /api/init-db - 初始化数据库</li>
       </ul>
 
+      <h2 style={{ marginTop: '2rem' }}>🤖 AI 大模型 API</h2>
+      <ul style={{ marginTop: '1rem', lineHeight: '1.8' }}>
+        <li><strong>GET</strong> /api/ai/models - 获取支持的模型列表</li>
+        <li><strong>POST</strong> /api/ai/generate - 使用模型生成文本</li>
+        <li><strong>GET</strong> /api/ai/test - 测试模型是否可用</li>
+      </ul>
+      <p style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
+        支持 Anthropic Claude 和 OpenAI 模型，API Key 通过环境变量配置
+      </p>
+
       <h2 style={{ marginTop: '2rem' }}>文档</h2>
       <p style={{ marginTop: '1rem' }}>
         查看 README.md 获取详细的 API 文档和使用说明。
