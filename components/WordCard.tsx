@@ -2,22 +2,35 @@
 
 import { useState } from 'react';
 import { Word } from '@/types';
+import WordDetailModal from '@/components/WordDetailModal';
 
 interface WordCardProps {
   word: Word;
   searchQuery: string;
   onUpdate: (word: Word) => void;
   onDelete: (wordId: string) => void;
-  onOpenNote: (wordId: string, sentenceKey: string, sentenceIndex: number, markdown: string) => void;
+  onOpenNote: (
+    wordId: string,
+    sentenceKey: string,
+    sentenceIndex: number,
+    markdown: string
+  ) => void;
 }
 
-export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpenNote }: WordCardProps) {
+export default function WordCard({
+  word,
+  searchQuery,
+  onUpdate,
+  onDelete,
+  onOpenNote,
+}: WordCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [newSentence, setNewSentence] = useState('');
   const [isAddingSentence, setIsAddingSentence] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const getApiKey = () => {
     if (typeof window !== 'undefined') {
@@ -59,7 +72,6 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
     );
   };
 
-
   const handleDelete = async () => {
     const confirmed = await showConfirm({
       title: '确认删除',
@@ -68,7 +80,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
       cancelText: '取消',
       confirmButtonStyle: 'danger',
     });
-    
+
     if (!confirmed) return;
     onDelete(word.id);
   };
@@ -157,7 +169,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
       cancelText: '取消',
       confirmButtonStyle: 'primary',
     });
-    
+
     if (!confirmed) return;
 
     setIsRefreshing(true);
@@ -195,9 +207,10 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
       if (enrichmentResponse.status === 'fulfilled' && enrichmentResponse.value.ok) {
         enrichmentData = await enrichmentResponse.value.json();
       } else {
-        const error = enrichmentResponse.status === 'rejected'
-          ? enrichmentResponse.reason
-          : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
+        const error =
+          enrichmentResponse.status === 'rejected'
+            ? enrichmentResponse.reason
+            : await enrichmentResponse.value.json().catch(() => ({ error: '请求失败' }));
         throw new Error(error.message || error.error || '获取单词分析失败');
       }
 
@@ -241,7 +254,6 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
     }
   };
 
-
   const normalizeSentenceKey = (s: string) => s.trim().toLowerCase();
 
   // 播放发音
@@ -280,10 +292,10 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 1;
-      
+
       utterance.onend = () => setIsPlaying(false);
       utterance.onerror = () => setIsPlaying(false);
-      
+
       window.speechSynthesis.speak(utterance);
     } else {
       setIsPlaying(false);
@@ -328,7 +340,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
   };
 
   return (
-    <div 
+    <div
       className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all duration-200"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
@@ -359,13 +371,23 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
             )}
           </div>
         </div>
-        
+
         {/* 操作按钮（hover 时显示，使用 opacity 和 pointer-events 避免布局抖动） */}
-        <div 
+        <div
           className={`flex gap-1 ml-2 transition-opacity duration-200 ${
             showActions ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDetailModal(true);
+            }}
+            className="p-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600"
+            title="查看详情"
+          >
+            ℹ️
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -404,7 +426,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
                   {meaning.translation || meaning.definitions[0]}
                 </span>
               </div>
-              
+
               {/* 例句（如果有） */}
               {meaning.examples && meaning.examples.length > 0 && (
                 <div className="ml-6 space-y-1.5">
@@ -416,9 +438,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
                       </div>
                       {/* 中文翻译 */}
                       {example.translation && (
-                        <div className="text-xs text-gray-500 ml-0">
-                          {example.translation}
-                        </div>
+                        <div className="text-xs text-gray-500 ml-0">{example.translation}</div>
                       )}
                     </div>
                   ))}
@@ -461,10 +481,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
           <div className="text-xs font-medium text-gray-600 mb-1.5">关联词</div>
           <div className="flex flex-wrap gap-1.5">
             {(word.relatedWords || []).map((relatedWord, idx) => (
-              <span
-                key={idx}
-                className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-700"
-              >
+              <span key={idx} className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-700">
                 {relatedWord}
               </span>
             ))}
@@ -479,11 +496,11 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
           {(word.sentences || []).slice(0, 1).map((sentence, idx) => {
             const sentenceKey = normalizeSentenceKey(sentence);
             const hasNote = word.notes && word.notes[sentenceKey];
-            
+
             return (
               <div key={idx} className="text-sm text-gray-700 mb-1">
                 {hasNote && (
-                  <span 
+                  <span
                     className="text-blue-500 mr-1 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -498,10 +515,10 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
               </div>
             );
           })}
-          
+
           {/* 展开查看更多例句 */}
           {sentenceCount > 1 && (
-            <div 
+            <div
               className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 mb-2"
               onClick={(e) => {
                 e.stopPropagation();
@@ -511,14 +528,14 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
               {isExpanded ? '收起' : `查看全部 ${sentenceCount} 个例句`}
             </div>
           )}
-          
+
           {/* 展开的例句列表 */}
           {isExpanded && sentenceCount > 1 && (
             <div className="mt-2 space-y-2">
               {(word.sentences || []).slice(1).map((sentence, idx) => {
                 const sentenceKey = normalizeSentenceKey(sentence);
                 const hasNote = word.notes && word.notes[sentenceKey];
-                
+
                 return (
                   <div
                     key={idx + 1}
@@ -558,7 +575,7 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
           )}
         </div>
       )}
-      
+
       {/* 添加例句输入框（始终显示在底部） */}
       <div className="mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-1.5">
@@ -588,7 +605,13 @@ export default function WordCard({ word, searchQuery, onUpdate, onDelete, onOpen
           </button>
         </div>
       </div>
+
+      {/* 详情弹窗 */}
+      <WordDetailModal
+        show={showDetailModal}
+        word={word}
+        onClose={() => setShowDetailModal(false)}
+      />
     </div>
   );
 }
-
