@@ -55,7 +55,8 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 // API 配置
-const API_BASE_URL = 'https://llm-api-xi.vercel.app';
+const API_BASE_URL_PRODUCTION = 'https://llm-api-xi.vercel.app';
+const API_BASE_URL_LOCAL = 'http://localhost:3000';
 const STORAGE_KEY_API_KEY = 'api_key';
 
 // 检测是否为"单词"与工具函数
@@ -224,17 +225,17 @@ const getApiBaseUrl = async (tabId) => {
       const tab = await chrome.tabs.get(tabId);
       if (tab && tab.url) {
         const url = new URL(tab.url);
-        // 如果当前页面是 localhost，使用本地 API
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-          return 'http://localhost:3000';
+        // 如果当前页面是生产环境，使用生产环境 API
+        if (url.hostname.includes('vercel.app') || url.hostname.includes('llm-api-xi')) {
+          return API_BASE_URL_PRODUCTION;
         }
       }
     }
   } catch (error) {
     console.warn('[getApiBaseUrl] 无法获取标签页信息，使用默认 API URL:', error);
   }
-  // 默认使用生产环境
-  return API_BASE_URL;
+  // 默认优先使用本地开发环境
+  return API_BASE_URL_LOCAL;
 };
 
 // 调用 API 分析单词（所有信息都从大模型获取）
@@ -385,8 +386,8 @@ const notifyBoardRefresh = async (sourceTabId) => {
     // 查找所有打开的 board 页面标签
     // 支持生产环境和本地开发环境
     const boardUrlPatterns = [
-      `${API_BASE_URL}/board`, // 生产环境
-      'http://localhost:3000/board', // 本地开发环境
+      `${API_BASE_URL_PRODUCTION}/board`, // 生产环境
+      `${API_BASE_URL_LOCAL}/board`, // 本地开发环境
       'http://127.0.0.1:3000/board', // 本地开发环境（IP 地址）
     ];
 

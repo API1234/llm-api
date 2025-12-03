@@ -165,11 +165,11 @@ export default function BoardPage() {
     const isReviewedToday = (reviews: number[] = []) =>
       reviews.some((t) => t >= startTs && t < endTs);
 
+    // 不过滤已复习的单词，让它们仍然显示在列表中（支持反向勾选）
     return words.filter((word) => {
       if (!word.createdAt) return false;
       const due = isDueToday(word.createdAt);
-      const reviewed = isReviewedToday(word.reviewTimes);
-      return due && !reviewed;
+      return due; // 移除 !reviewed 条件，显示所有今天到期的单词（包括已复习的）
     });
   };
 
