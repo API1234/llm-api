@@ -225,17 +225,18 @@ const getApiBaseUrl = async (tabId) => {
       const tab = await chrome.tabs.get(tabId);
       if (tab && tab.url) {
         const url = new URL(tab.url);
-        // 如果当前页面是生产环境，使用生产环境 API
-        if (url.hostname.includes('vercel.app') || url.hostname.includes('llm-api-xi')) {
-          return API_BASE_URL_PRODUCTION;
+        const hostname = url.hostname.toLowerCase();
+        // 如果当前页面是 localhost，使用本地 API
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('localhost:') || hostname.startsWith('127.0.0.1:')) {
+          return API_BASE_URL_LOCAL;
         }
       }
     }
   } catch (error) {
     console.warn('[getApiBaseUrl] 无法获取标签页信息，使用默认 API URL:', error);
   }
-  // 默认优先使用本地开发环境
-  return API_BASE_URL_LOCAL;
+  // 默认使用生产环境 API
+  return API_BASE_URL_PRODUCTION;
 };
 
 // 调用 API 分析单词（所有信息都从大模型获取）
