@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
       } else if (apiKeys.openai) {
         // 优先使用 gpt-4o-mini（更稳定，不需要特殊权限）
         testModelId = 'gpt-4o-mini';
+      } else if (apiKeys.qwen) {
+        // 优先使用通义千问 Plus（稳定且性能好）
+        testModelId = 'qwen-plus';
       } else if (xhsApiKeys['xhs-anthropic']) {
         // 尝试内部 Anthropic 模型
         testModelId = 'claude-3-7-sonnet';
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
       } else {
         return NextResponse.json(
           { 
-            error: 'No API Key configured. Please set ANTHROPIC_API_KEY, OPENAI_API_KEY, XHS_API_KEY, or XHS_ANTHROPIC_API_KEY environment variable.',
+            error: 'No API Key configured. Please set ANTHROPIC_API_KEY, OPENAI_API_KEY, QWEN_API_KEY, XHS_API_KEY, or XHS_ANTHROPIC_API_KEY environment variable.',
             configuredKeys: [
               ...Object.keys(apiKeys).filter(key => apiKeys[key as keyof typeof apiKeys]),
               ...Object.keys(xhsApiKeys).filter(key => xhsApiKeys[key as keyof typeof xhsApiKeys])

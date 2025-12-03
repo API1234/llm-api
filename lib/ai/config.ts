@@ -19,6 +19,7 @@ export function getApiKeyFromEnv(provider: ModelProvider): string | null {
   const envKeyMap: Record<ModelProvider, string> = {
     anthropic: 'ANTHROPIC_API_KEY',
     openai: 'OPENAI_API_KEY',
+    qwen: 'QWEN_API_KEY',
     custom: 'CUSTOM_API_KEY',
   };
 
@@ -33,6 +34,7 @@ export function getAllApiKeysFromEnv(): Partial<Record<ModelProvider, string>> {
   return {
     anthropic: getApiKeyFromEnv('anthropic') || undefined,
     openai: getApiKeyFromEnv('openai') || undefined,
+    qwen: getApiKeyFromEnv('qwen') || undefined,
     custom: getApiKeyFromEnv('custom') || undefined,
   };
 }
@@ -52,6 +54,9 @@ export function validateApiKey(provider: ModelProvider, apiKey: string): boolean
       return apiKey.startsWith('sk-') || apiKey.length > 20;
     case 'openai':
       // OpenAI API Key 通常以 sk- 开头
+      return apiKey.startsWith('sk-') || apiKey.length > 20;
+    case 'qwen':
+      // 通义千问 API Key 通常以 sk- 开头
       return apiKey.startsWith('sk-') || apiKey.length > 20;
     case 'custom':
       return apiKey.length > 0;
@@ -89,6 +94,15 @@ export function getApiKeyConfig(provider: ModelProvider): ApiKeyConfig | null {
       config.baseUrl = customBaseUrl;
     }
     // 如果不设置 baseUrl，@ai-sdk/openai 会使用默认的官方 API
+  }
+
+  // 对于 qwen，使用通义千问的兼容模式端点
+  if (provider === 'qwen') {
+    // 通义千问兼容 OpenAI API，使用兼容模式端点
+    // 默认使用国内端点，如果设置了 QWEN_BASE_URL 则使用自定义端点
+    const customBaseUrl = process.env.QWEN_BASE_URL;
+    // 兼容模式端点：https://dashscope.aliyuncs.com/compatible-mode/v1
+    config.baseUrl = customBaseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   }
 
   return config;

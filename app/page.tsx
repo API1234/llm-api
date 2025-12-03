@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
   if (typeof window !== 'undefined' && (window as any).showToast) {
@@ -12,6 +12,19 @@ export default function Home() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [selectedModel, setSelectedModel] = useState<string>('claude-3-7-sonnet');
+  
+  // 外部模型测试相关状态
+  const [testingExternal, setTestingExternal] = useState(false);
+  const [testResultExternal, setTestResultExternal] = useState<any>(null);
+  const [selectedExternalModel, setSelectedExternalModel] = useState<string>('');
+  const [externalModels, setExternalModels] = useState<Array<{
+    modelId: string;
+    name: string;
+    provider: string;
+    description?: string;
+    apiKeyConfigured: boolean;
+  }>>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   
   // 单词分析测试相关状态
   const [wordInput, setWordInput] = useState<string>('');
@@ -29,6 +42,35 @@ export default function Home() {
     { id: 'deepseek-coder', name: 'deepseek-coder (内部)' },
     { id: 'deepseek-r1-xhs', name: 'deepseek-r1 (内部)' },
   ];
+
+  // 加载外部模型列表
+  useEffect(() => {
+    const loadExternalModels = async () => {
+      setLoadingModels(true);
+      try {
+        const response = await fetch('/api/ai/models');
+        const data = await response.json();
+        if (response.ok && data.models && Array.isArray(data.models)) {
+          setExternalModels(data.models);
+          // 设置默认选中的模型（优先选择已配置 API Key 的模型）
+          const configuredModel = data.models.find((m: any) => m.apiKeyConfigured);
+          if (configuredModel) {
+            setSelectedExternalModel(configuredModel.modelId);
+          } else if (data.models.length > 0) {
+            setSelectedExternalModel(data.models[0].modelId);
+          }
+        } else {
+          console.error('Failed to load external models: Invalid response', data);
+        }
+      } catch (error) {
+        console.error('Failed to load external models:', error);
+        showToast('加载外部模型列表失败', 'error');
+      } finally {
+        setLoadingModels(false);
+      }
+    };
+    loadExternalModels();
+  }, []);
 
   const handleTestXhsModel = async () => {
     setTesting(true);
@@ -75,6 +117,62 @@ export default function Home() {
       });
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleTestExternalModel = async () => {
+    if (!selectedExternalModel) {
+      showToast('请选择模型', 'warning');
+      return;
+    }
+
+    setTestingExternal(true);
+    setTestResultExternal(null);
+
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          modelId: selectedExternalModel,
+          prompt: '你好！请用中文简单介绍一下你自己。',
+          options: {
+            maxTokens: 200,
+            temperature: 0.7,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setTestResultExternal({
+          success: true,
+          model: data.model,
+          provider: data.provider,
+          text: data.text,
+          usage: data.usage,
+        });
+        showToast('测试成功', 'success');
+      } else {
+        setTestResultExternal({
+          success: false,
+          error: data.error || '未知错误',
+          details: data.details,
+        });
+        showToast(`测试失败: ${data.error || '未知错误'}`, 'error');
+      }
+    } catch (error: any) {
+      setTestResultExternal({
+        success: false,
+        error: '请求失败',
+        details: error.message,
+      });
+      showToast(`请求失败: ${error.message}`, 'error');
+    } finally {
+      setTestingExternal(false);
     }
   };
 
@@ -178,17 +276,19 @@ export default function Home() {
             />
             <button
               onClick={handleAnalyzeWord}
-              disabled={analyzing || !wordInput.trim()}
+              disabled={analyzing}
               style={{
                 padding: '0.5rem 1.5rem',
                 fontSize: '1rem',
-                backgroundColor: analyzing || !wordInput.trim() ? '#ccc' : '#0070f3',
+                backgroundColor: analyzing ? '#ccc' : wordInput.trim() ? '#0070f3' : '#ccc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: analyzing || !wordInput.trim() ? 'not-allowed' : 'pointer',
+                cursor: analyzing ? 'not-allowed' : wordInput.trim() ? 'pointer' : 'not-allowed',
                 fontWeight: 'bold',
+                opacity: analyzing || !wordInput.trim() ? 0.6 : 1,
               }}
+              title={!wordInput.trim() ? '请输入单词' : ''}
             >
               {analyzing ? '分析中...' : '🔍 分析单词'}
             </button>
@@ -222,6 +322,120 @@ export default function Home() {
                 }}>
                   {JSON.stringify(analyzeResult.enrichment, null, 2)}
                 </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <h2 style={{ marginTop: '2rem' }}>🌐 外部模型快速测试</h2>
+      <div style={{ 
+        marginTop: '1rem', 
+        padding: '1.5rem', 
+        border: '1px solid #ddd', 
+        borderRadius: '8px',
+        backgroundColor: '#f9f9f9'
+      }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            选择外部模型：
+          </label>
+          {loadingModels ? (
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+              加载模型中...
+            </div>
+          ) : externalModels.length === 0 ? (
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+              暂无可用模型，请检查 API Key 配置
+            </div>
+          ) : (
+            <select
+              value={selectedExternalModel}
+              onChange={(e) => setSelectedExternalModel(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+              disabled={testingExternal}
+            >
+              {externalModels.map((model) => (
+                <option key={model.modelId} value={model.modelId}>
+                  {model.name} ({model.provider}) {model.apiKeyConfigured ? '✓' : '⚠️ 未配置 API Key'}
+                </option>
+              ))}
+            </select>
+          )}
+          {externalModels.length > 0 && (
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+              支持 Anthropic Claude、OpenAI GPT 和通义千问模型
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={handleTestExternalModel}
+          disabled={testingExternal || !selectedExternalModel || externalModels.length === 0}
+          style={{
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            backgroundColor: testingExternal || !selectedExternalModel || externalModels.length === 0 ? '#ccc' : '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: testingExternal || !selectedExternalModel || externalModels.length === 0 ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold',
+          }}
+        >
+          {testingExternal ? '测试中...' : '🚀 测试外部模型'}
+        </button>
+
+        {testResultExternal && (
+          <div style={{ 
+            marginTop: '1.5rem', 
+            padding: '1rem', 
+            borderRadius: '4px',
+            backgroundColor: testResultExternal.success ? '#e8f5e9' : '#ffebee',
+            border: `1px solid ${testResultExternal.success ? '#4caf50' : '#f44336'}`,
+          }}>
+            {testResultExternal.success ? (
+              <div>
+                <h3 style={{ marginTop: 0, color: '#2e7d32' }}>✅ 测试成功</h3>
+                <p><strong>模型：</strong>{testResultExternal.model}</p>
+                <p><strong>提供商：</strong>{testResultExternal.provider}</p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <strong>响应：</strong>
+                  <div style={{ 
+                    marginTop: '0.5rem', 
+                    padding: '0.75rem', 
+                    backgroundColor: 'white', 
+                    borderRadius: '4px',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}>
+                    {testResultExternal.text}
+                  </div>
+                </div>
+                {testResultExternal.usage && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+                    <strong>Token 使用：</strong>
+                    输入 {testResultExternal.usage.inputTokens || testResultExternal.usage.promptTokens || 'N/A'} / 
+                    输出 {testResultExternal.usage.outputTokens || testResultExternal.usage.completionTokens || 'N/A'} / 
+                    总计 {testResultExternal.usage.totalTokens || 'N/A'}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <h3 style={{ marginTop: 0, color: '#c62828' }}>❌ 测试失败</h3>
+                <p><strong>错误：</strong>{testResultExternal.error}</p>
+                {testResultExternal.details && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+                    <strong>详情：</strong>{testResultExternal.details}
+                  </p>
+                )}
               </div>
             )}
           </div>

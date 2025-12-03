@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateTextWithXhsModel } from '@/lib/ai-xhs';
+import { generateTextWithModel } from '@/lib/ai';
 import type { Meaning, Example } from '@/types';
 
 /**
@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
 
 只返回 JSON 对象，不要包含其他文字说明。`;
 
-    const result = await generateTextWithXhsModel('qwen3-235b-a22b', comprehensivePrompt, {
+    // 使用外部通义千问模型（qwen-plus）
+    const result = await generateTextWithModel('qwen-plus', comprehensivePrompt, {
       maxTokens: 2000,
       temperature: 0.3,
     });

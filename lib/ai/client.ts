@@ -12,13 +12,13 @@ import { getModelConfig } from './models';
 
 /**
  * 根据提供商创建模型实例
- * 
+ *
  * 在新版本的 @ai-sdk 中，使用 createAnthropic 和 createOpenAI 创建 provider
  * 然后调用 provider(modelId) 获取模型实例
  */
 export function createModel(provider: ModelProvider, modelId: string) {
   const config = getApiKeyConfig(provider);
-  
+
   if (!config) {
     throw new Error(
       `API Key not configured for provider: ${provider}. Please set ${provider.toUpperCase()}_API_KEY environment variable.`
@@ -31,16 +31,17 @@ export function createModel(provider: ModelProvider, modelId: string) {
   }
 
   if (modelConfig.provider !== provider) {
-    throw new Error(
-      `Model ${modelId} does not belong to provider ${provider}`
-    );
+    throw new Error(`Model ${modelId} does not belong to provider ${provider}`);
   }
+
+  // 使用模型配置中的 modelId（可能是实际 API 需要的模型名称）
+  const actualModelId = modelConfig.modelId;
 
   switch (provider) {
     case 'anthropic': {
       // 创建 Anthropic provider，然后调用 provider(modelId)
       const anthropicProvider = createAnthropic({ apiKey: config.apiKey });
-      return anthropicProvider(modelId);
+      return anthropicProvider(actualModelId);
     }
     case 'openai': {
       // 创建 OpenAI provider，然后调用 provider(modelId)
@@ -49,7 +50,18 @@ export function createModel(provider: ModelProvider, modelId: string) {
         apiKey: config.apiKey,
         ...(config.baseUrl && { baseURL: config.baseUrl }),
       });
-      return openaiProvider(modelId);
+      return openaiProvider(actualModelId);
+    }
+    case 'qwen': {
+      // 通义千问兼容 OpenAI API，使用 createOpenAI
+      // 注意：通义千问兼容模式使用标准的 /v1/chat/completions 端点，而不是新的 /v1/responses
+      // 因此需要使用 .chat() 方法而不是直接调用 provider
+      const qwenProvider = createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      });
+      // 使用 .chat() 方法以使用 /v1/chat/completions 端点
+      return qwenProvider.chat(actualModelId);
     }
     default:
       throw new Error(`Unsupported provider: ${provider}`);
@@ -81,7 +93,7 @@ export async function generateTextWithModel(
     model,
     prompt,
   };
-  
+
   // 添加可选参数（如果提供）
   if (options?.maxTokens !== undefined) {
     generateParams.maxTokens = options.maxTokens;
@@ -98,12 +110,14 @@ export async function generateTextWithModel(
     return result;
   } catch (error: any) {
     // 处理 v1 模型不兼容错误
-    if (error.message?.includes('UnsupportedModelVersionError') || 
-        error.message?.includes('Unsupported model version v1')) {
+    if (
+      error.message?.includes('UnsupportedModelVersionError') ||
+      error.message?.includes('Unsupported model version v1')
+    ) {
       throw new Error(
         `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
-        `Original error: ${error.message}`
+          `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
+          `Original error: ${error.message}`
       );
     }
     throw error;
@@ -136,7 +150,7 @@ export async function streamTextWithModel(
     model,
     prompt,
   };
-  
+
   // 添加可选参数（如果提供）
   if (options?.maxTokens !== undefined) {
     streamParams.maxTokens = options.maxTokens;
@@ -153,15 +167,16 @@ export async function streamTextWithModel(
     return result;
   } catch (error: any) {
     // 处理 v1 模型不兼容错误
-    if (error.message?.includes('UnsupportedModelVersionError') || 
-        error.message?.includes('Unsupported model version v1')) {
+    if (
+      error.message?.includes('UnsupportedModelVersionError') ||
+      error.message?.includes('Unsupported model version v1')
+    ) {
       throw new Error(
         `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-        `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
-        `Original error: ${error.message}`
+          `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
+          `Original error: ${error.message}`
       );
     }
     throw error;
   }
 }
-
