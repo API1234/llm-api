@@ -34,24 +34,6 @@ export const SUPPORTED_MODELS: Record<string, ModelConfig> = {
     name: '通义千问 Turbo',
     description: '阿里云通义千问 Turbo 模型（快速响应）',
   },
-  'qwen-7b-chat': {
-    provider: 'qwen',
-    modelId: 'qwen-7b-chat',
-    name: '通义千问 7B Chat',
-    description: '阿里云通义千问 7B 对话模型',
-  },
-  'qwen-14b-chat': {
-    provider: 'qwen',
-    modelId: 'qwen-14b-chat',
-    name: '通义千问 14B Chat',
-    description: '阿里云通义千问 14B 对话模型',
-  },
-  'qwen-72b-chat': {
-    provider: 'qwen',
-    modelId: 'qwen-72b-chat',
-    name: '通义千问 72B Chat',
-    description: '阿里云通义千问 72B 对话模型（最强性能）',
-  },
 };
 
 /**
