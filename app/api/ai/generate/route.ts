@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateTextWithModel, getModelConfig } from '@/lib/ai';
-import { generateTextWithXhsModel, getXhsModelConfig } from '@/lib/ai-xhs';
 
 /**
  * POST /api/ai/generate
@@ -40,30 +39,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 验证模型是否支持（先检查外部模型，再检查内部模型）
-    let modelConfig = getModelConfig(modelId);
-    let isXhsModel = false;
+    // 验证模型是否支持
+    const modelConfig = getModelConfig(modelId);
     
     if (!modelConfig) {
-      // 尝试检查是否为内部模型
-      const xhsModelConfig = getXhsModelConfig(modelId);
-      if (xhsModelConfig) {
-        isXhsModel = true;
-      } else {
-        return NextResponse.json(
-          { error: `Unsupported model: ${modelId}` },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json(
+        { error: `Unsupported model: ${modelId}` },
+        { status: 400 }
+      );
     }
 
-    // 生成文本（根据模型类型选择不同的生成函数）
-    const result = isXhsModel
-      ? await generateTextWithXhsModel(modelId, prompt, options)
-      : await generateTextWithModel(modelId, prompt, options);
+    // 生成文本
+    const result = await generateTextWithModel(modelId, prompt, options);
 
     // 获取模型配置信息
-    const finalModelConfig = isXhsModel ? getXhsModelConfig(modelId) : modelConfig;
+    const finalModelConfig = modelConfig;
     
     return NextResponse.json({
       success: true,

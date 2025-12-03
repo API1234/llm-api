@@ -4,7 +4,6 @@
  */
 
 import { generateText, streamText } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { ModelProvider } from './models';
 import { getApiKeyConfig } from './config';
@@ -13,8 +12,8 @@ import { getModelConfig } from './models';
 /**
  * 根据提供商创建模型实例
  *
- * 在新版本的 @ai-sdk 中，使用 createAnthropic 和 createOpenAI 创建 provider
- * 然后调用 provider(modelId) 获取模型实例
+ * 通义千问兼容 OpenAI API，使用 createOpenAI 创建 provider
+ * 然后调用 provider.chat(modelId) 获取模型实例
  */
 export function createModel(provider: ModelProvider, modelId: string) {
   const config = getApiKeyConfig(provider);
@@ -38,20 +37,6 @@ export function createModel(provider: ModelProvider, modelId: string) {
   const actualModelId = modelConfig.modelId;
 
   switch (provider) {
-    case 'anthropic': {
-      // 创建 Anthropic provider，然后调用 provider(modelId)
-      const anthropicProvider = createAnthropic({ apiKey: config.apiKey });
-      return anthropicProvider(actualModelId);
-    }
-    case 'openai': {
-      // 创建 OpenAI provider，然后调用 provider(modelId)
-      // 只有在明确设置了 baseURL 时才传递，否则使用默认的官方 API
-      const openaiProvider = createOpenAI({
-        apiKey: config.apiKey,
-        ...(config.baseUrl && { baseURL: config.baseUrl }),
-      });
-      return openaiProvider(actualModelId);
-    }
     case 'qwen': {
       // 通义千问兼容 OpenAI API，使用 createOpenAI
       // 注意：通义千问兼容模式使用标准的 /v1/chat/completions 端点，而不是新的 /v1/responses
@@ -116,7 +101,6 @@ export async function generateTextWithModel(
     ) {
       throw new Error(
         `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-          `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
           `Original error: ${error.message}`
       );
     }
@@ -173,7 +157,6 @@ export async function streamTextWithModel(
     ) {
       throw new Error(
         `Model ${modelId} uses v1 specification which is incompatible with AI SDK 5. ` +
-          `Please use standard @ai-sdk/anthropic provider or upgrade the model provider. ` +
           `Original error: ${error.message}`
       );
     }
