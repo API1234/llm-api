@@ -24,7 +24,6 @@ export default function WordCard({
   onDelete,
   onOpenNote,
 }: WordCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingSentence, setPlayingSentence] = useState<string | null>(null); // 正在播放的例句
   const [showActions, setShowActions] = useState(false);
@@ -510,114 +509,60 @@ export default function WordCard({
 
       {/* 例句（参考图片样式：高亮单词，简洁显示） */}
       {sentenceCount > 0 && (
-        <div className="mb-3">
-          {/* 显示第一个例句（始终显示） */}
-          {(word.sentences || []).slice(0, 1).map((sentence, idx) => {
+        <div className="mb-3 space-y-2">
+          {/* 显示所有例句 */}
+          {(word.sentences || []).map((sentence, idx) => {
             const sentenceKey = normalizeSentenceKey(sentence);
             const hasNote = word.notes && word.notes[sentenceKey];
 
             return (
-              <div key={idx} className="text-sm text-gray-700 mb-1 leading-relaxed">
-                {hasNote && (
-                  <span
-                    className="text-blue-500 cursor-pointer mr-1"
+              <div
+                key={idx}
+                className="text-sm text-gray-700 leading-relaxed flex items-start gap-1.5 group"
+              >
+                <span
+                  className={`${
+                    hasNote
+                      ? 'text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                      : 'text-gray-400 hover:text-blue-500 hover:bg-gray-50'
+                  } cursor-pointer transition-all flex-shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNote(word.id, sentenceKey, idx, word.notes?.[sentenceKey] || '');
+                  }}
+                  title={hasNote ? '查看/编辑解析' : '添加解析'}
+                >
+                  {hasNote ? '📝 已解析' : '📝'}
+                </span>
+                <span className="flex-1">
+                  {highlightWordInSentence(sentence, word.word)}
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onOpenNote(word.id, sentenceKey, idx, word.notes![sentenceKey]);
+                      handlePlaySentence(sentence);
                     }}
-                    title="查看笔记"
+                    className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
+                    title="播放例句"
+                    disabled={playingSentence === sentence && playingSentence !== null}
                   >
-                    📝
-                  </span>
-                )}
-                {highlightWordInSentence(sentence, word.word)}
+                    <span className="text-xs leading-none">
+                      {playingSentence === sentence ? '⏸️' : '🔊'}
+                    </span>
+                  </button>
+                </span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handlePlaySentence(sentence);
+                    handleDeleteSentence(idx);
                   }}
-                  className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
-                  title="播放例句"
-                  disabled={playingSentence === sentence && playingSentence !== null}
+                  className="text-red-500 hover:text-red-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  title="删除例句"
                 >
-                  <span className="text-xs leading-none">
-                    {playingSentence === sentence ? '⏸️' : '🔊'}
-                  </span>
+                  ✕
                 </button>
               </div>
             );
           })}
-
-          {/* 展开查看更多例句 */}
-          {sentenceCount > 1 && (
-            <div
-              className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 mb-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-            >
-              {isExpanded ? '收起' : `查看全部 ${sentenceCount} 个例句`}
-            </div>
-          )}
-
-          {/* 展开的例句列表 */}
-          {isExpanded && sentenceCount > 1 && (
-            <div className="mt-2 space-y-2">
-              {(word.sentences || []).slice(1).map((sentence, idx) => {
-                const sentenceKey = normalizeSentenceKey(sentence);
-                const hasNote = word.notes && word.notes[sentenceKey];
-
-                return (
-                  <div
-                    key={idx + 1}
-                    className="flex items-start justify-between gap-2 text-sm text-gray-700 group"
-                  >
-                    <div
-                      className="flex-1 leading-relaxed"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (hasNote) {
-                          onOpenNote(word.id, sentenceKey, idx + 1, word.notes![sentenceKey]);
-                        }
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onOpenNote(word.id, sentenceKey, idx + 1, word.notes?.[sentenceKey] || '');
-                      }}
-                    >
-                      {hasNote && <span className="text-blue-500 mr-1">📝</span>}
-                      {highlightWordInSentence(sentence, word.word)}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlaySentence(sentence);
-                        }}
-                        className="inline-flex items-center justify-center w-4 h-4 ml-1.5 mb-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 align-middle"
-                        title="播放例句"
-                        disabled={playingSentence === sentence && playingSentence !== null}
-                      >
-                        <span className="text-xs leading-none">
-                          {playingSentence === sentence ? '⏸️' : '🔊'}
-                        </span>
-                      </button>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteSentence(idx + 1);
-                      }}
-                      className="text-red-500 hover:text-red-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                      title="删除例句"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useEffect } from 'react';
+import MDEditor from '@uiw/react-md-editor';
+import '@uiw/react-md-editor/markdown-editor.css';
 import Modal from '@/components/ui/Modal';
 
 interface SentenceNoteModalProps {
@@ -24,8 +25,17 @@ export default function SentenceNoteModal({
   onSave,
 }: SentenceNoteModalProps) {
   const [markdown, setMarkdown] = useState(initialMarkdown);
-  const [mode, setMode] = useState<'edit' | 'view'>(initialMarkdown ? 'view' : 'edit');
   const [loading, setLoading] = useState(false);
+
+  // 当 initialMarkdown 变化时更新 markdown
+  useEffect(() => {
+    setMarkdown(initialMarkdown);
+  }, [initialMarkdown]);
+
+  // 判断初始是否有内容（用于决定预览模式，只在打开时判断，不影响编辑过程）
+  const hasInitialContent = !!initialMarkdown?.trim();
+  // 判断当前是否有内容（用于显示删除按钮）
+  const hasContent = !!markdown?.trim();
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     if (typeof window !== 'undefined' && (window as any).showToast) {
@@ -114,7 +124,7 @@ export default function SentenceNoteModal({
       cancelText: '取消',
       confirmButtonStyle: 'danger',
     });
-    
+
     if (!confirmed) return;
 
     const apiKey = getApiKey();
@@ -165,64 +175,37 @@ export default function SentenceNoteModal({
   return (
     <Modal show={show} onClose={onClose} title="例句详细解析（Markdown）" size="xl">
       <div className="space-y-4">
-        {mode === 'view' ? (
-          <div className="prose max-w-none min-h-[200px] p-4 bg-gray-50 rounded-lg">
-            <ReactMarkdown>{markdown || '暂无解析'}</ReactMarkdown>
-          </div>
-        ) : (
-          <textarea
-            value={markdown}
-            onChange={(e) => setMarkdown(e.target.value)}
-            placeholder="使用 Markdown 编写解析...（如：单词高亮、语法点、替换、近义词等）"
-            className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+        <div data-color-mode="light" className="min-h-[600px]">
+          <MDEditor
+            value={markdown || ''}
+            onChange={(value) => setMarkdown(value || '')}
+            preview={hasInitialContent ? 'preview' : 'edit'}
+            visibleDragbar={false}
+            textareaProps={{
+              placeholder: '使用 Markdown 编写解析...（如：单词高亮、语法点、替换、近义词等）',
+            }}
+            height={600}
           />
-        )}
+        </div>
         <div className="flex justify-end gap-3 pt-2">
-          {mode === 'view' ? (
-            <>
-              <button
-                onClick={() => setMode('edit')}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-              >
-                编辑
-              </button>
-              {markdown && (
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
-                >
-                  删除解析
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setMode('view')}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-              >
-                预览
-              </button>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-                disabled={loading}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading}
-              >
-                保存
-              </button>
-            </>
+          {hasContent && (
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
+              删除解析
+            </button>
           )}
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading}
+          >
+            保存
+          </button>
         </div>
       </div>
     </Modal>
   );
 }
-

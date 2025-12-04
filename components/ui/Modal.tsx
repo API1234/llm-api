@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
   closeOnBackdrop?: boolean;
 }
 
@@ -23,16 +23,66 @@ export default function Modal({
 
   useEffect(() => {
     if (show) {
-      // 防止背景滚动
-      document.body.style.overflow = 'hidden';
+      // 保存当前滚动位置
+      const scrollY = window.scrollY;
+      const body = document.body;
+      const html = document.documentElement;
+
+      // 计算滚动条宽度（避免闪动）
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+      // 防止背景滚动 - 使用更完善的方法
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollY}px`;
+      body.style.width = '100%';
+      body.style.overflow = 'hidden';
+      // 补偿滚动条宽度，避免页面闪动
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+      
+      // 保存滚动位置到 data 属性，以便恢复
+      body.setAttribute('data-scroll-y', scrollY.toString());
+
       setTimeout(() => setIsVisible(true), 10);
+
+      return () => {
+        // 恢复滚动位置
+        const savedScrollY = body.getAttribute('data-scroll-y');
+        body.style.position = '';
+        body.style.top = '';
+        body.style.width = '';
+        body.style.overflow = '';
+        body.style.paddingRight = '';
+        body.removeAttribute('data-scroll-y');
+        
+        if (savedScrollY) {
+          window.scrollTo(0, parseInt(savedScrollY, 10));
+        }
+      };
     } else {
-      document.body.style.overflow = '';
       setIsVisible(false);
     }
+  }, [show]);
 
+  // 阻止触摸滚动穿透（移动端）
+  useEffect(() => {
+    if (!show) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // 如果触摸事件发生在 Modal 外部，阻止默认行为
+      const target = e.target as HTMLElement;
+      const modalContent = target.closest('[data-modal-content]');
+      if (!modalContent) {
+        e.preventDefault();
+      }
+    };
+
+    // 使用 passive: false 以便可以 preventDefault
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    
     return () => {
-      document.body.style.overflow = '';
+      document.removeEventListener('touchmove', handleTouchMove);
     };
   }, [show]);
 
@@ -57,6 +107,7 @@ export default function Modal({
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-3xl',
+    fullscreen: 'max-w-[95vw] max-h-[95vh]',
   };
 
   const handleBackdropClick = () => {
@@ -79,11 +130,12 @@ export default function Modal({
       
       {/* 对话框 */}
       <div
+        data-modal-content
         className={`
           relative bg-white rounded-2xl shadow-2xl w-full ${sizeClasses[size]}
           transform transition-all duration-300
           ${isVisible ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}
-          max-h-[90vh] overflow-hidden flex flex-col
+          ${size === 'fullscreen' ? 'h-[95vh]' : 'max-h-[90vh]'} overflow-hidden flex flex-col
         `}
         onClick={(e) => e.stopPropagation()}
       >
@@ -114,7 +166,7 @@ export default function Modal({
         )}
         
         {/* 内容区域 */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
           {children}
         </div>
       </div>
